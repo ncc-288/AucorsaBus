@@ -21,12 +21,6 @@ Real-time bus tracking and arrival estimations for the **Aucorsa** network in C�
 - 🔍 **Smart Search**: Find any stop or line quickly with debounced autocomplete.
 - 🗺️ **Two-Way Routing**: Intelligent grouping of "Ida" and "Vuelta" (Outbound/Inbound) directions.
 
-## 📸 Screenshots
-
-| Light Mode | Official Branding |
-| :---: | :---: |
-| ![Light Mode](assets/readme/screenshot_1.png) | ![Logo in Drawer](assets/readme/screenshot_2.png) |
-
 ---
 
 ## 🛠️ Technical Documentation
