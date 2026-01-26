@@ -56,7 +56,7 @@ This project includes extensive research on the Aucorsa API. Whether you are a d
    ```
 
 ### Download Preview
-You can find the latest stable release in the [Release APK](App/build/app/outputs/flutter-apk/app-release.apk) folder (local build included in this repo).
+You can download the latest stable release directly from the [GitHub Releases](https://github.com/ncc-288/AucorsaBus/releases/latest/download/app-release.apk) page.
 
 ---
 
