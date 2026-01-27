@@ -57,7 +57,7 @@ This project includes research on the Aucorsa API. Whether you are a developer l
    ```
 
 ### Download Preview
-You can download the latest stable release directly from the [GitHub Releases](https://github.com/ncc-288/AucorsaBus/releases/latest/download/app-release.apk) page.
+You can download the latest stable release directly from the [GitHub Releases](https://github.com/ncc-288/AucorsaBus/releases/latest) page.
 
 ---
 
