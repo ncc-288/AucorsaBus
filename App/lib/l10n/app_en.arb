@@ -25,5 +25,7 @@
   "now": "now",
   "serviceStatus": "Status",
   "noServiceAlerts": "No service alerts.",
-  "viewMore": "View more"
+  "viewMore": "View more",
+  "newVersionAvailable": "New version available",
+  "download": "Download"
 }

@@ -25,5 +25,7 @@
   "now": "ahora",
   "serviceStatus": "Estado",
   "noServiceAlerts": "No hay avisos de servicio.",
-  "viewMore": "Ver más"
+  "viewMore": "Ver más",
+  "newVersionAvailable": "Nueva versión disponible",
+  "download": "Descargar"
 }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'l10n/app_localizations.dart';
-import 'package:provider/provider.dart';
+import 'package:provider/provider.dart' as legacy_provider;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
 import 'services/api_service.dart';
@@ -16,13 +17,15 @@ void main() async {
   await NameOverrideService().initialize();
   
   runApp(
-    MultiProvider(
-      providers: [
-        Provider(create: (_) => ApiService()),
-        ChangeNotifierProvider(create: (_) => ThemeService()),
-        ChangeNotifierProvider(create: (_) => LocaleService()),
-      ],
-      child: const AucorsaApp(),
+    ProviderScope(
+      child: legacy_provider.MultiProvider(
+        providers: [
+          legacy_provider.Provider(create: (_) => ApiService()),
+          legacy_provider.ChangeNotifierProvider(create: (_) => ThemeService()),
+          legacy_provider.ChangeNotifierProvider(create: (_) => LocaleService()),
+        ],
+        child: const AucorsaApp(),
+      ),
     ),
   );
 }
@@ -83,8 +86,8 @@ class AucorsaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Watch theme and locale changes
-    final themeService = context.watch<ThemeService>();
-    final localeService = context.watch<LocaleService>();
+    final themeService = legacy_provider.Provider.of<ThemeService>(context);
+    final localeService = legacy_provider.Provider.of<LocaleService>(context);
     
     return MaterialApp(
       title: 'Aucorsa Córdoba',

@@ -1,3 +1,4 @@
+// ignore_for_file: deprecated_member_use
 import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
@@ -9,10 +10,11 @@ import '../services/api_service.dart';
 import '../services/favorites_service.dart';
 import '../services/theme_service.dart';
 import '../main.dart';
-import 'line_detail_screen.dart';
 import 'stop_detail_screen.dart';
 import 'search_delegate.dart';
-import '../services/line_color_service.dart';
+import '../services/update_service.dart';
+import '../widgets/lines_list.dart';
+import '../widgets/favorites_dashboard.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -42,6 +44,33 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadLines();
+    _checkForUpdates();
+  }
+
+  Future<void> _checkForUpdates() async {
+    final updateService = UpdateService();
+    final updateInfo = await updateService.checkForUpdate();
+    
+    if (updateInfo.updateAvailable && mounted) {
+      final l10n = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${l10n?.newVersionAvailable ?? "New version available"}: ${updateInfo.latestVersion}'),
+          duration: const Duration(seconds: 10),
+          action: SnackBarAction(
+            label: l10n?.download ?? 'Download',
+            onPressed: () async {
+              if (updateInfo.releaseUrl != null) {
+                final uri = Uri.parse(updateInfo.releaseUrl!);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              }
+            },
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -165,14 +194,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _formatLastUpdate(AppLocalizations l10n) {
-    if (_lastUpdateTime == null) return '';
-    final h = _lastUpdateTime!.hour.toString().padLeft(2, '0');
-    final m = _lastUpdateTime!.minute.toString().padLeft(2, '0');
-    final s = _lastUpdateTime!.second.toString().padLeft(2, '0');
-    return '${l10n.lastUpdate}: $h:$m:$s';
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -269,15 +290,37 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
+            const Divider(),
+            // GitHub Repository Link
+            ListTile(
+              leading: const Icon(Icons.code),
+              title: const Text('GitHub'),
+              subtitle: const Text('ncc-288/AucorsaBus'),
+              onTap: () async {
+                final uri = Uri.parse('https://github.com/ncc-288/AucorsaBus');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
           ],
         ),
       ),
       body: _loading 
         ? const Center(child: CircularProgressIndicator()) 
         : _selectedIndex == 0 
-           ? _buildLinesList()
+           ? LinesList(lines: _lines, errorMessage: _errorMessage)
            : _selectedIndex == 1
-              ? _buildFavoritesDashboard(l10n)
+              ? FavoritesDashboard(
+                  favorites: _favorites,
+                  estimations: _favEstimations,
+                  lastUpdateTime: _lastUpdateTime,
+                  onRefresh: _refreshFavoriteEstimations,
+                  onRemove: (lineId, stopId) async {
+                    await _favService.removeFavorite(lineId, stopId);
+                    _loadFavorites();
+                  },
+                )
               : _buildStatusTab(l10n),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
@@ -298,174 +341,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildLinesList() {
-    if (_lines.isEmpty && _errorMessage != null) {
-       return Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)));
-    }
-    return ListView.builder(
-      itemCount: _lines.length,
-      itemBuilder: (context, index) {
-        final line = _lines[index];
-        final displayId = line.label.split('ㅤ')[0].trim();
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: LineColorService.getColor(displayId),
-              foregroundColor: Colors.white,
-              child: Text(
-                displayId, 
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            title: Text(
-              (line.label.contains('ㅤ') ? line.label.substring(line.label.indexOf('ㅤ') + 1) : line.label).trim(),
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => LineDetailScreen(line: line)),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFavoritesDashboard(AppLocalizations l10n) {
-    if (_favorites.isEmpty) {
-       return Center(
-         child: Column(
-           mainAxisAlignment: MainAxisAlignment.center,
-           children: [
-             const Icon(Icons.favorite_border, size: 64, color: Colors.grey),
-             const SizedBox(height: 16),
-             Text(l10n.noStopsFound),
-           ],
-         ),
-       );
-    }
-    return Column(
-      children: [
-        // Last update time banner
-        if (_lastUpdateTime != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            color: Theme.of(context).brightness == Brightness.light 
-                ? const Color(0xFFE8F5E9) 
-                : const Color(0xFF1B5E20),
-            child: Center(
-              child: Text(
-                _formatLastUpdate(l10n),
-                style: TextStyle(
-                  fontSize: 12, 
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).brightness == Brightness.light
-                      ? const Color(0xFF2E7D32)
-                      : Colors.white70,
-                ),
-              ),
-            ),
-          ),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _refreshFavoriteEstimations,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: _favorites.length,
-              itemBuilder: (context, index) {
-                final fav = _favorites[index];
-                final est = _favEstimations[fav.key];
-                
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        // Line Icon
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: LineColorService.getColor(fav.lineId),
-                          foregroundColor: Colors.white,
-                          child: Text(
-                            fav.lineId,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Stop and Line Info
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                fav.stopLabel,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                fav.lineLabel,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Estimations
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              est?.nextBus ?? '...',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: (est?.nextBus.contains('min') == true || est?.nextBus == 'ahora' || est?.nextBus == 'now')
-                                    ? Colors.green[700]
-                                    : Theme.of(context).colorScheme.onSurface,
-                              ),
-                            ),
-                            if (est?.followingBus != null && est!.followingBus != '-')
-                              Text(
-                                est.followingBus,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                                ),
-                              ),
-                          ],
-                        ),
-                        // Delete button
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () async {
-                            await _favService.removeFavorite(fav.lineId, fav.stopId);
-                            _loadFavorites();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ],
     );
   }
 

@@ -85,4 +85,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get viewMore => 'Ver más';
+
+  @override
+  String get newVersionAvailable => 'Nueva versión disponible';
+
+  @override
+  String get download => 'Descargar';
 }

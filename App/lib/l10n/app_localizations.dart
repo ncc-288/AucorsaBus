@@ -253,6 +253,18 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Ver más'**
   String get viewMore;
+
+  /// No description provided for @newVersionAvailable.
+  ///
+  /// In es, this message translates to:
+  /// **'Nueva versión disponible'**
+  String get newVersionAvailable;
+
+  /// No description provided for @download.
+  ///
+  /// In es, this message translates to:
+  /// **'Descargar'**
+  String get download;
 }
 
 class _AppLocalizationsDelegate
