@@ -82,6 +82,18 @@ Returns arrival estimations. This endpoint returns **escaped HTML string** insid
 </div>
 ```
 
+### 5. Service Status & Alerts
+Aucorsa uses the standard WordPress REST API for service disruptions and news.
+
+**Example Request:**
+`GET /wp-json/wp/v2/estado-del-servicio`
+
+**Key Fields:**
+- `date`: ISO 8601 timestamp of the alert.
+- `title.rendered`: HTML-escaped title of the incident.
+- `content.rendered`: Full clinical/operational description of the disruption.
+- `slug`: URL-friendly identifier.
+
 ---
 
 ## Technical Considerations

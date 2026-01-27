@@ -14,13 +14,13 @@ Real-time bus tracking and arrival estimations for the **Aucorsa** network in CÃ
 
 ## Features
 
-- **Real-time Arrival Times**: Live estimations for all stops and lines.
-- **Premium UI**: Modern interface with Lucide icons, animated interactions, and official line branding.
-- **Localization**: Full support for Spanish and English languages, with automatic name correction for stops and lines.
+- **Favorites Dashboard**: A real-time dashboard showing live estimations for your specific (Line, Stop) pairs.
+- **Service Status Alerts**: Live notifications and service disruptions fetched directly from the official WordPress API, with expandable details.
+- **Modern Navigation**: Optimized navigation with a dedicated Bottom Navigation Bar for Lines, Favorites, and Status.
+- **Premium UI**: Modern interface with Lucide icons, smooth animations, and official line branding.
+- **Localization**: Full support for Spanish and English, with smart encoding for high-quality text.
 - **Adaptive Theme**: High-contrast light and dark modes.
-- **Favorites**: Save most-used stops for instant access.
-- **Smart Search**: Find any stop or line quickly with optimized search.
-- **Intelligent Routing**: Grouping of Outbound/Inbound directions for easier navigation.
+- **Smart Search**: Optimized search to find any stop or line instantly.
 
 ---
 
