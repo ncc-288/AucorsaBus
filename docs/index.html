@@ -1,38 +1,83 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
+
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="/AucorsaBus/">
-
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="aucorsa_app">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>aucorsa_app</title>
-  <link rel="manifest" href="manifest.json">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Aucorsa Bus - Tu app no oficial para buses en tiempo real en Córdoba, España.">
+    <title>Aucorsa Bus - Córdoba en Tiempo Real</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" href="app/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+    <header class="hero">
+        <img src="images/cabecera.png" alt="Aucorsa Bus Header" class="hero-image">
+        <div class="hero-content">
+            <h1>Aucorsa Bus</h1>
+            <p class="tagline">Información en tiempo real para los autobuses urbanos de Córdoba.</p>
+            <div class="cta-buttons">
+                <a href="https://github.com/ncc-288/AucorsaBus/releases/latest/download/app-release.apk"
+                    class="btn btn-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Descargar APK
+                </a>
+                <a href="app/" class="btn btn-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polygon points="10 8 16 12 10 16 10 8" />
+                    </svg>
+                    Abrir Web App
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="features">
+            <h2>Características</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🚍</div>
+                    <h3>Tiempo Real</h3>
+                    <p>Consulta las estimaciones de llegada de cualquier línea y parada al instante.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⭐</div>
+                    <h3>Favoritos Inteligentes</h3>
+                    <p>Guarda pares de (Línea, Parada) para ver tus trayectos más usados de un vistazo.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚠️</div>
+                    <h3>Estado del Servicio</h3>
+                    <p>Recibe avisos de incidencias, desvíos y eventos especiales directamente desde AUCORSA.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌙</div>
+                    <h3>Tema Oscuro</h3>
+                    <p>Interfaz moderna con modo claro y oscuro de alto contraste.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>
+            <a href="https://github.com/ncc-288/AucorsaBus" target="_blank">Ver en GitHub</a>
+            &nbsp;|&nbsp;
+            <a href="https://aucorsa.es" target="_blank">Sitio Oficial AUCORSA</a>
+        </p>
+        <p class="disclaimer">App no oficial. Todos los logos y datos pertenecen a AUCORSA S.A.</p>
+    </footer>
 </body>
+
 </html>
