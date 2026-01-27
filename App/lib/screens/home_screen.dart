@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
-import 'dart:developer' as developer;
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/favorites_service.dart';
 import '../services/theme_service.dart';
+import '../main.dart';
 import 'line_detail_screen.dart';
 import 'stop_detail_screen.dart';
 import 'search_delegate.dart';
@@ -80,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
       delegate: StopSearchDelegate(api),
     );
 
-    if (result != null) {
+    if (result != null && mounted) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => StopDetailScreen(stop: result)),
@@ -90,19 +91,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = _selectedIndex == 0 ? 'Aucorsa - Líneas' : 'Favoritos';
+    final l10n = AppLocalizations.of(context)!;
+    final title = _selectedIndex == 0 ? 'Aucorsa - ${l10n.lines}' : l10n.favorites;
     
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
         elevation: 0,
         centerTitle: true,
-        // Removed hardcoded background to let global theme take over
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: _openSearch,
-            tooltip: 'Buscar Parada',
+            tooltip: l10n.search,
           ),
         ],
       ),
@@ -126,9 +127,9 @@ class _HomeScreenState extends State<HomeScreen> {
                      height: 60,
                    ),
                    const SizedBox(height: 10),
-                   const Text(
-                     'Aucorsa Córdoba', 
-                     style: TextStyle(
+                   Text(
+                     l10n.appTitle, 
+                     style: const TextStyle(
                        color: Color(0xFF00A99D), 
                        fontSize: 22, 
                        fontWeight: FontWeight.bold
@@ -139,13 +140,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.list),
-              title: const Text('Líneas'),
+              title: Text(l10n.lines),
               selected: _selectedIndex == 0,
               onTap: () => _onItemTapped(0),
             ),
             ListTile(
               leading: const Icon(Icons.favorite),
-              title: const Text('Paradas Favoritas'),
+              title: Text(l10n.favorites),
               selected: _selectedIndex == 1,
               onTap: () => _onItemTapped(1),
             ),
@@ -154,11 +155,44 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (context, themeService, child) {
                 return ListTile(
                   leading: Icon(themeService.themeModeIcon),
-                  title: const Text('Tema'),
+                  title: Text(l10n.settings),
                   subtitle: Text(themeService.themeModeLabel),
                   onTap: () {
                     themeService.toggleTheme();
                   },
+                );
+              },
+            ),
+            const Divider(),
+            // Language selector
+            Consumer<LocaleService>(
+              builder: (context, localeService, child) {
+                final currentLang = localeService.locale.languageCode;
+                return ExpansionTile(
+                  leading: const Icon(Icons.language),
+                  title: Text(l10n.language),
+                  children: [
+                    RadioListTile<String>(
+                      value: 'es',
+                      groupValue: currentLang,
+                      title: Text(l10n.spanish),
+                      onChanged: (value) {
+                        if (value != null) {
+                          localeService.setLocale(Locale(value));
+                        }
+                      },
+                    ),
+                    RadioListTile<String>(
+                      value: 'en',
+                      groupValue: currentLang,
+                      title: Text(l10n.english),
+                      onChanged: (value) {
+                        if (value != null) {
+                          localeService.setLocale(Locale(value));
+                        }
+                      },
+                    ),
+                  ],
                 );
               },
             ),
@@ -169,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ? const Center(child: CircularProgressIndicator()) 
         : _selectedIndex == 0 
            ? _buildLinesList()
-           : _buildFavoritesList(),
+           : _buildFavoritesList(l10n),
     );
   }
 
@@ -209,16 +243,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFavoritesList() {
+  Widget _buildFavoritesList(AppLocalizations l10n) {
     if (_favorites.isEmpty) {
-       return const Center(
+       return Center(
          child: Column(
            mainAxisAlignment: MainAxisAlignment.center,
            children: [
-             Icon(Icons.favorite_border, size: 64, color: Colors.grey),
-             SizedBox(height: 16),
-             Text("No tienes paradas guardadas."),
-             Text("Busca una parada o selecciónala de una línea."),
+             const Icon(Icons.favorite_border, size: 64, color: Colors.grey),
+             const SizedBox(height: 16),
+             Text(l10n.noStopsFound),
            ],
          ),
        );
@@ -232,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
            child: ListTile(
              leading: const Icon(Icons.place, color: Colors.red),
              title: Text(stop.label),
-             subtitle: Text("Parada #${stop.id}"),
+             subtitle: Text("${l10n.stopCode}: ${stop.id}"),
              trailing: IconButton(
                icon: const Icon(Icons.delete_outline),
                onPressed: () async {

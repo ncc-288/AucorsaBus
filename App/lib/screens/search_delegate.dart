@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
-import '../services/line_color_service.dart';
 
 class StopSearchDelegate extends SearchDelegate<BusStop?> {
   final ApiService apiService;
@@ -41,7 +40,7 @@ class StopSearchDelegate extends SearchDelegate<BusStop?> {
         iconTheme: theme.iconTheme.copyWith(color: theme.colorScheme.primary),
       ),
       inputDecorationTheme: theme.inputDecorationTheme.copyWith(
-        hintStyle: TextStyle(color: theme.colorScheme.primary.withOpacity(0.5)),
+        hintStyle: TextStyle(color: theme.colorScheme.primary.withValues(alpha: 0.5)),
         border: InputBorder.none,
       ),
     );
@@ -50,7 +49,7 @@ class StopSearchDelegate extends SearchDelegate<BusStop?> {
   @override
   Widget? buildLeading(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.arrow_back),
+      icon: const Icon(Icons.arrow_back_ios_rounded, size: 20),
       onPressed: () {
         _debounceTimer?.cancel();
         close(context, null);

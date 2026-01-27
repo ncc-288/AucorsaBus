@@ -1,19 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
 import 'services/api_service.dart';
 import 'services/theme_service.dart';
+import 'services/name_override_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize name override service
+  await NameOverrideService().initialize();
+  
   runApp(
     MultiProvider(
       providers: [
         Provider(create: (_) => ApiService()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
+        ChangeNotifierProvider(create: (_) => LocaleService()),
       ],
       child: const AucorsaApp(),
     ),
   );
+}
+
+/// Service to manage the app's locale with persistence
+class LocaleService extends ChangeNotifier {
+  Locale _locale = const Locale('es');
+  
+  LocaleService() {
+    _loadLocale();
+  }
+  
+  Locale get locale => _locale;
+  
+  Future<void> _loadLocale() async {
+    final prefs = await SharedPreferences.getInstance();
+    final langCode = prefs.getString('language_code') ?? 'es';
+    _locale = Locale(langCode);
+    notifyListeners();
+  }
+  
+  Future<void> setLocale(Locale locale) async {
+    if (_locale == locale) return;
+    _locale = locale;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('language_code', locale.languageCode);
+    notifyListeners();
+  }
 }
 
 class AucorsaApp extends StatelessWidget {
@@ -24,11 +60,25 @@ class AucorsaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Watch theme changes
+    // Watch theme and locale changes
     final themeService = context.watch<ThemeService>();
+    final localeService = context.watch<LocaleService>();
     
     return MaterialApp(
       title: 'Aucorsa Córdoba',
+      
+      // Localization config
+      locale: localeService.locale,
+      supportedLocales: const [
+        Locale('es'), // Spanish
+        Locale('en'), // English
+      ],
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       
       // Light Theme - Strictly White and Professional
       theme: ThemeData(

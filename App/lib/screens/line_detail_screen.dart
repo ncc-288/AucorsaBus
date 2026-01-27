@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/favorites_service.dart';
 import '../services/line_color_service.dart';
+import '../services/name_override_service.dart';
+import '../widgets/premium_arrows.dart';
 import 'stop_detail_screen.dart';
 
 class LineDetailScreen extends StatefulWidget {
@@ -21,22 +24,26 @@ class _LineDetailScreenState extends State<LineDetailScreen> {
   bool _loading = true;
   int _selectedDirIndex = 0;
   
-  // Cache estimations per direction index to avoid refetching
-  Map<int, Map<String, Estimation?>> _estimationsByDirection = {};
+  // Cache estimations per direction index
+  final Map<int, Map<String, Estimation?>> _estimationsByDirection = {};
+  final Map<int, DateTime?> _lastUpdateTimeByDirection = {};
+  
+  // Auto-refresh timer
+  Timer? _autoRefreshTimer;
+  static const int _autoRefreshSeconds = 30;
+  
+  // Name override service
+  final NameOverrideService _nameService = NameOverrideService();
   
   Map<String, Estimation?> get _estimations => 
       _estimationsByDirection[_selectedDirIndex] ?? {};
   
+  DateTime? get _lastUpdateTime => _lastUpdateTimeByDirection[_selectedDirIndex];
+  
   final FavoritesService _favService = FavoritesService();
   Set<String> _favoriteIds = {};
 
-  bool _canRefresh = true;
-  Timer? _cooldownTimer;
-  Timer? _autoRefreshTimer;
-  int _secondsRemaining = 0;
-  DateTime? _lastRefreshTime;
-  static const int _cooldownSeconds = 30;
-  static const int _autoRefreshSeconds = 60;
+  String _getCacheKey(int dirIndex) => 'line_${widget.line.id}_dir_$dirIndex';
 
   @override
   void initState() {
@@ -48,37 +55,32 @@ class _LineDetailScreenState extends State<LineDetailScreen> {
 
   @override
   void dispose() {
-    _cooldownTimer?.cancel();
     _autoRefreshTimer?.cancel();
     super.dispose();
   }
-  
+
   void _startAutoRefresh() {
     _autoRefreshTimer = Timer.periodic(
-      Duration(seconds: _autoRefreshSeconds), 
-      (_) => _refreshAllEstimations()
+      Duration(seconds: _autoRefreshSeconds),
+      (_) => _forceRefreshCurrentDirection(),
     );
   }
-  
-  /// Force refresh all directions (clears cache)
-  Future<void> _refreshAllEstimations() async {
-    if (!_canRefresh) return;
+
+  /// Force refresh bypassing cache
+  Future<void> _forceRefreshCurrentDirection() async {
+    if (_directions.isEmpty || _selectedDirIndex >= _directions.length) return;
     
-    // Clear cache
-    _estimationsByDirection.clear();
+    final api = Provider.of<ApiService>(context, listen: false);
+    final stops = _directions[_selectedDirIndex].stops;
     
-    // Start cooldown
-    _startCooldown();
+    // Use force refresh which bypasses cache check but updates cache
+    final estimations = await api.forceRefreshLineEstimations(widget.line.id, _selectedDirIndex, stops);
     
-    // Record refresh time
-    setState(() {
-      _lastRefreshTime = DateTime.now();
-    });
-    
-    // Reload all
-    if (_directions.isNotEmpty) {
-      final api = Provider.of<ApiService>(context, listen: false);
-      await _preloadAllDirections(api, _directions);
+    if (mounted) {
+      setState(() {
+        _estimationsByDirection[_selectedDirIndex] = estimations;
+        _lastUpdateTimeByDirection[_selectedDirIndex] = api.getLastUpdateTime(_getCacheKey(_selectedDirIndex));
+      });
     }
   }
 
@@ -116,242 +118,197 @@ class _LineDetailScreenState extends State<LineDetailScreen> {
         _loading = false;
       });
       
-      // PERFORMANCE: Preload estimations for ALL directions in parallel
+      // Preload estimations for the first direction using smart caching
       if (dirs.isNotEmpty) {
-        _preloadAllDirections(api, dirs);
+        _loadEstimationsForDirection(0);
       }
     }
   }
   
-  /// Fetches estimations for all directions in parallel for instant tab switching
-  Future<void> _preloadAllDirections(ApiService api, List<RouteDirection> dirs) async {
-    // Create futures for all directions
-    final futures = <Future<void>>[];
+  Future<void> _loadEstimationsForDirection(int dirIndex) async {
+    if (_directions.isEmpty || dirIndex >= _directions.length) return;
     
-    for (int dirIndex = 0; dirIndex < dirs.length; dirIndex++) {
-      futures.add(_fetchEstimationsForDirection(api, dirIndex, dirs[dirIndex].stops));
-    }
-    
-    // Fetch all in parallel
-    await Future.wait(futures);
-  }
-  
-  /// Fetches estimations for a specific direction
-  Future<void> _fetchEstimationsForDirection(ApiService api, int dirIndex, List<BusStop> stops) async {
-    // Skip if already cached
-    if (_estimationsByDirection.containsKey(dirIndex) && 
-        _estimationsByDirection[dirIndex]!.isNotEmpty) {
-      return;
-    }
-    
-    final List<Future<Estimation?>> futures = stops.map((stop) => 
-        api.fetchEstimation(stop.id, widget.line.id, stop.label)).toList();
-
-    final results = await Future.wait(futures);
-    
-    if (mounted) {
-      final newEstimations = <String, Estimation?>{};
-      for (var est in results) {
-        if (est != null) {
-          newEstimations[est.stopId] = est;
-        }
-      }
-      setState(() {
-        _estimationsByDirection[dirIndex] = newEstimations;
-      });
-    }
-  }
-  
-  Future<void> _fetchEstimationsForCurrentDirection({bool forceRefresh = false}) async {
-    // Check if we already have estimations for this direction
-    final hasCachedData = _estimationsByDirection.containsKey(_selectedDirIndex) && 
-        _estimationsByDirection[_selectedDirIndex]!.isNotEmpty;
-    
-    // For automatic fetches (direction switch), use cache if available
-    if (hasCachedData && !forceRefresh) {
-      return;
-    }
-    
-    // For manual refresh, check cooldown
-    if (!_canRefresh) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Espera $_secondsRemaining segundos para actualizar."))
-      );
-      return;
-    }
-
-    // Start cooldown for new network request
-    _startCooldown();
-
-    if (_directions.isEmpty) return;
-    
-    final stops = _directions[_selectedDirIndex].stops;
     final api = Provider.of<ApiService>(context, listen: false);
+    final stops = _directions[dirIndex].stops;
     
-    final List<Future<Estimation?>> futures = stops.map((stop) => 
-        api.fetchEstimation(stop.id, widget.line.id, stop.label)).toList();
-
-    final results = await Future.wait(futures);
+    // Use the smart caching method with direction index
+    final estimations = await api.getLineEstimations(widget.line.id, dirIndex, stops);
     
     if (mounted) {
-      final newEstimations = <String, Estimation?>{};
-      for (var est in results) {
-        if (est != null) {
-          newEstimations[est.stopId] = est;
-        }
-      }
       setState(() {
-        _estimationsByDirection[_selectedDirIndex] = newEstimations;
+        _estimationsByDirection[dirIndex] = estimations;
+        _lastUpdateTimeByDirection[dirIndex] = api.getLastUpdateTime(_getCacheKey(dirIndex));
       });
     }
   }
 
-  void _startCooldown() {
-    // Cancel any existing timer first to prevent leaks
-    _cooldownTimer?.cancel();
-    
-    setState(() {
-      _canRefresh = false;
-      _secondsRemaining = _cooldownSeconds;
-    });
-
-    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        _secondsRemaining--;
-      });
-      if (_secondsRemaining <= 0) {
-        timer.cancel();
-        setState(() {
-          _canRefresh = true;
-        });
-      }
-    });
+  String _formatLastUpdate(AppLocalizations l10n) {
+    final updateTime = _lastUpdateTime;
+    if (updateTime == null) return '';
+    final h = updateTime.hour.toString().padLeft(2, '0');
+    final m = updateTime.minute.toString().padLeft(2, '0');
+    final s = updateTime.second.toString().padLeft(2, '0');
+    return '${l10n.lastUpdate}: $h:$m:$s';
   }
 
-  String _getLastRefreshText() {
-    if (_lastRefreshTime == null) return '';
-    final diff = DateTime.now().difference(_lastRefreshTime!);
-    if (diff.inSeconds < 60) return 'hace ${diff.inSeconds}s';
-    if (diff.inMinutes < 60) return 'hace ${diff.inMinutes}min';
-    return 'hace ${diff.inHours}h';
+  // Removed _getDirectionIcon - now using DirectionChip widget
+
+  /// Fix line name encoding using local override
+  String _fixLineName(String name) {
+    return _nameService.getLineName(name, name);
+  }
+
+  /// Fix stop name using local override
+  String _fixStopName(String stopId, String fallback) {
+    return _nameService.getStopName(stopId, fallback);
+  }
+
+  /// Get localized direction label
+  String _getDirectionLabel(AppLocalizations l10n, int index) {
+    if (index == 0) return l10n.ida;
+    return l10n.vuelta;
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final lineColor = LineColorService.getColor(widget.line.label.split('ㅤ')[0].trim());
+    
+    // Fix the line title for encoding issues
+    final lineTitle = _fixLineName(widget.line.label);
+    
     return Scaffold(
       appBar: AppBar(
-        title: Text("Línea ${widget.line.label}"),
+        title: Text("${l10n.line} $lineTitle"),
         elevation: 0,
         centerTitle: true,
-        actions: [
-            if (_lastRefreshTime != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Center(
-                  child: Text(
-                    _getLastRefreshText(),
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-                  ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: _canRefresh 
-                ? IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: _refreshAllEstimations,
-                  )
-                : Center(child: Text("$_secondsRemaining", style: const TextStyle(fontWeight: FontWeight.bold))),
-            )
-        ],
       ),
       body: _loading 
         ? const Center(child: CircularProgressIndicator())
         : _directions.isEmpty 
-          ? const Center(child: Text("No se encontraron paradas."))
+          ? Center(child: Text(l10n.noStopsFound))
           : Column(
               children: [
-                if (_directions.length > 1) 
+                // Direction Selector with Visual Indicators
+                if (_directions.length > 1)
                   Container(
-                    height: 50,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _directions.length,
-                      itemBuilder: (context, index) {
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.light 
+                          ? const Color(0xFFF5F5F5) 
+                          : const Color(0xFF2A2A2A),
+                      border: Border(
+                        bottom: BorderSide(color: Theme.of(context).dividerColor),
+                      ),
+                    ),
+                    child: Row(
+                      children: List.generate(_directions.length, (index) {
                         final isSelected = _selectedDirIndex == index;
-                        final dir = _directions[index];
-                        return Padding(
-                          padding: const EdgeInsets.all(4.0),
-                          child: ChoiceChip(
-                            label: Text(dir.directionLabel),
-                            selected: isSelected,
-                            onSelected: (selected) {
-                              if (selected) {
-                                setState(() {
-                                  _selectedDirIndex = index;
-                                });
-                                // Always call - the function handles caching and cooldown internally
-                                _fetchEstimationsForCurrentDirection();
-                              }
-                            },
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: DirectionChip(
+                              isSelected: isSelected,
+                              isOutbound: index == 0,
+                              label: _getDirectionLabel(l10n, index),
+                              activeColor: lineColor,
+                              onTap: () {
+                                if (!isSelected) {
+                                  setState(() => _selectedDirIndex = index);
+                                  _loadEstimationsForDirection(index);
+                                }
+                              },
+                            ),
                           ),
                         );
-                      },
+                      }),
+                    ),
+                  ),
+                // Last update time banner
+                if (_lastUpdateTime != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    color: Theme.of(context).brightness == Brightness.light 
+                        ? const Color(0xFFE8F5E9) 
+                        : const Color(0xFF1B5E20),
+                    child: Center(
+                      child: Text(
+                        _formatLastUpdate(l10n),
+                        style: TextStyle(
+                          fontSize: 12, 
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).brightness == Brightness.light
+                              ? const Color(0xFF2E7D32)
+                              : Colors.white70,
+                        ),
+                      ),
                     ),
                   ),
                 Expanded(
                   child: RefreshIndicator(
-                    onRefresh: _refreshAllEstimations,
+                    onRefresh: _forceRefreshCurrentDirection,
                     child: ListView.builder(
                       itemCount: _directions[_selectedDirIndex].stops.length,
                       itemBuilder: (context, index) {
-                      final stop = _directions[_selectedDirIndex].stops[index];
-                      final est = _estimations[stop.id];
-                      final isFav = _favoriteIds.contains(stop.id);
+                        final stops = _directions[_selectedDirIndex].stops;
+                        final stop = stops[index];
+                        final est = _estimations[stop.id];
+                        final isFav = _favoriteIds.contains(stop.id);
+                        final isLast = index == stops.length - 1;
 
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: ListTile(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => StopDetailScreen(stop: stop)),
-                            );
-                          },
-                          leading: CircleAvatar(
-                            backgroundColor: LineColorService.getColor(widget.line.label.split('ㅤ')[0].trim()),
-                            foregroundColor: Colors.white,
-                            child: Text(stop.id, style: const TextStyle(fontSize: 10, color: Colors.white)),
-                          ),
-                          title: Text(stop.label, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: est == null 
-                            ? const Text("...", style: TextStyle(color: Colors.grey))
-                            : Row(
-                                children: [
-                                  Text(
-                                    est.nextBus, 
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold, 
-                                      color: est.nextBus == "Sin servicio" ? Colors.red : 
-                                             (est.nextBus.contains("min") || est.nextBus == "ahora") ? Colors.green[700] : Colors.black,
-                                    )
-                                  ),
-                                  if (est.followingBus != '-') 
-                                     Text("  /  ${est.followingBus}", style: const TextStyle(color: Colors.grey)),
-                                ],
+                        // Apply name override if available
+                        final displayStopName = _fixStopName(stop.id, stop.label);
+
+                        return Column(
+                          children: [
+                            Card(
+                              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              child: ListTile(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => StopDetailScreen(stop: stop)),
+                                  );
+                                },
+                                leading: CircleAvatar(
+                                  backgroundColor: lineColor,
+                                  foregroundColor: Colors.white,
+                                  child: Text(stop.id, style: const TextStyle(fontSize: 10, color: Colors.white)),
+                                ),
+                                title: Text(displayStopName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: est == null 
+                                  ? const Text("...", style: TextStyle(color: Colors.grey))
+                                  : Row(
+                                      children: [
+                                        Text(
+                                          est.nextBus, 
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold, 
+                                            color: est.nextBus == l10n.noService ? Colors.red : 
+                                                   (est.nextBus.contains("min") || est.nextBus == "ahora" || est.nextBus == "now") ? Colors.green[700] : Colors.black,
+                                          )
+                                        ),
+                                        if (est.followingBus != '-') 
+                                           Text("  /  ${est.followingBus}", style: const TextStyle(color: Colors.grey)),
+                                      ],
+                                    ),
+                                trailing: IconButton(
+                                  icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
+                                  color: isFav ? Colors.red : Colors.grey,
+                                  onPressed: () => _toggleFavorite(stop),
+                                ),
                               ),
-                          trailing: IconButton(
-                            icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
-                            color: isFav ? Colors.red : Colors.grey,
-                            onPressed: () => _toggleFavorite(stop),
-                          ),
-                        ),
-                      );
-                    },
+                            ),
+                            // Premium vertical connector (except for last stop)
+                            if (!isLast)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 32),
+                                child: VerticalStopConnector(color: lineColor),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),

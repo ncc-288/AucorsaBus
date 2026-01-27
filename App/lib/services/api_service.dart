@@ -9,13 +9,50 @@ class ApiService {
   
   String get _proxyUrl => kIsWeb ? 'https://corsproxy.io/?' : '';
 
-  String? _nonce = "3483e74fbd"; // Start with hardcoded, update dynamically
-  DateTime? _nonceTimestamp = DateTime.now();
+  String? _nonce;
+  DateTime? _nonceTimestamp;
   static const Duration _nonceMaxAge = Duration(hours: 1);
+
+  // Smart Caching: Stores last fetch time per stop/line
+  final Map<String, DateTime> _lastFetchTime = {};
+  final Map<String, List<Estimation>> _stopEstimationsCache = {};
+  final Map<String, Map<String, Estimation?>> _lineEstimationsCache = {};
+  static const Duration _cacheMaxAge = Duration(seconds: 30);
 
   void _log(String message) {
     developer.log(message, name: 'ApiService');
     if (kDebugMode) print("[ApiService] $message");
+  }
+
+  /// Decodes common HTML entities to their character equivalents.
+  String _decodeHtmlEntities(String text) {
+    return text
+        // Named entities - lowercase
+        .replaceAll('&aacute;', 'á').replaceAll('&eacute;', 'é')
+        .replaceAll('&iacute;', 'í').replaceAll('&oacute;', 'ó')
+        .replaceAll('&uacute;', 'ú').replaceAll('&ntilde;', 'ñ')
+        .replaceAll('&uuml;', 'ü')
+        // Named entities - uppercase
+        .replaceAll('&Aacute;', 'Á').replaceAll('&Eacute;', 'É')
+        .replaceAll('&Iacute;', 'Í').replaceAll('&Oacute;', 'Ó')
+        .replaceAll('&Uacute;', 'Ú').replaceAll('&Ntilde;', 'Ñ')
+        .replaceAll('&Uuml;', 'Ü')
+        // Numeric entities - uppercase accented
+        .replaceAll('&#193;', 'Á').replaceAll('&#201;', 'É')
+        .replaceAll('&#205;', 'Í').replaceAll('&#211;', 'Ó')
+        .replaceAll('&#218;', 'Ú').replaceAll('&#209;', 'Ñ')
+        // Numeric entities - lowercase accented
+        .replaceAll('&#225;', 'á').replaceAll('&#233;', 'é')
+        .replaceAll('&#237;', 'í').replaceAll('&#243;', 'ó')
+        .replaceAll('&#250;', 'ú').replaceAll('&#241;', 'ñ')
+        // Common symbols
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&#x27;', "'");
   }
 
   bool _isNonceExpired() {
@@ -28,7 +65,7 @@ class ApiService {
     if (_nonce != null && !force && !_isNonceExpired()) return;
 
     try {
-      final targetUrl = 'https://aucorsa.es/';
+      const targetUrl = 'https://aucorsa.es/';
       final url = kIsWeb 
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}') 
           : Uri.parse(targetUrl);
@@ -109,7 +146,7 @@ class ApiService {
         try {
           final List<dynamic> data = json.decode(stopsResponse.body);
           for (var item in data) {
-            stopNames[item['id'].toString()] = item['label'].toString();
+            stopNames[item['id'].toString()] = _decodeHtmlEntities(item['label'].toString());
           }
         } catch (e) {
           _log("Error parsing stop names: $e");
@@ -129,7 +166,7 @@ class ApiService {
             if (f['geometry']?['type'] == 'Point') {
               final id = f['id']?.toString() ?? '';
               
-              String name = stopNames[id] ?? f['properties']?['name']?.toString() ?? 'Parada $id';
+              String name = _decodeHtmlEntities(stopNames[id] ?? f['properties']?['name']?.toString() ?? 'Parada $id');
               
               if (id.isNotEmpty) {
                 stops.add(BusStop(id: id, label: name));
@@ -142,7 +179,7 @@ class ApiService {
           if (routeLabel != null) {
             final labelMatch = RegExp(r'→\s*(.+?)<').firstMatch(routeLabel);
             if (labelMatch != null) {
-              dirLabel = 'Hacia ${labelMatch.group(1)!}';
+              dirLabel = 'Hacia ${_decodeHtmlEntities(labelMatch.group(1)!)}';
             }
           }
 
@@ -183,14 +220,17 @@ class ApiService {
 
   Future<Estimation?> fetchEstimation(String stopId, String lineId, String stopName) async {
     try {
-      final targetUrl = '$_baseUrl/estimations/stop?line=$lineId&current_line=$lineId&stop_id=$stopId&_wpnonce=$_nonce';
+      // Add timestamp to prevent CORS proxy caching
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final targetUrl = '$_baseUrl/estimations/stop?line=$lineId&current_line=$lineId&stop_id=$stopId&_wpnonce=$_nonce&_t=$timestamp';
       final uri = kIsWeb 
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
       
       final response = await http.get(uri);
       if (response.statusCode == 200) {
-        String body = response.body;
+        // Use UTF-8 decoding for proper character handling
+        String body = utf8.decode(response.bodyBytes, allowMalformed: true);
 
         try {
           if (body.startsWith('"') || body.startsWith("'")) {
@@ -208,10 +248,12 @@ class ApiService {
 
         // Use dotAll regex here too for consistency
         final nextMatch = RegExp(r'Pr&oacute;ximo autob&uacute;s: <strong[^>]*>([^<]+)<', dotAll: true).firstMatch(body);
-        if (nextMatch != null) next = nextMatch.group(1)!.trim();
+        if (nextMatch != null) next = _decodeHtmlEntities(nextMatch.group(1)!.trim());
 
         final followMatch = RegExp(r'Siguiente autob&uacute;s: <strong[^>]*>([^<]+)<', dotAll: true).firstMatch(body);
-        if (followMatch != null) follow = followMatch.group(1)!.trim();
+        if (followMatch != null) follow = _decodeHtmlEntities(followMatch.group(1)!.trim());
+        
+        _log("fetchEstimation for stop $stopId: next='$next', follow='$follow'");
         
         if (next != 'Sin servicio') {
           return Estimation(stopId: stopId, stopName: stopName, nextBus: next, followingBus: follow);
@@ -227,7 +269,9 @@ class ApiService {
     if (_nonce == null) return [];
 
     try {
-      final targetUrl = '$_baseUrl/estimations/stop?line=&current_line=&stop_id=$stopId&_wpnonce=$_nonce';
+      // Add timestamp to prevent CORS proxy caching
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final targetUrl = '$_baseUrl/estimations/stop?line=&current_line=&stop_id=$stopId&_wpnonce=$_nonce&_t=$timestamp';
       final uri = kIsWeb 
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
@@ -235,7 +279,8 @@ class ApiService {
       final response = await http.get(uri);
       
       if (response.statusCode == 200) {
-        String body = response.body;
+        // Use UTF-8 decoding from raw bytes for proper character handling
+        String body = utf8.decode(response.bodyBytes, allowMalformed: true);
 
         try {
           if (body.startsWith('"') || body.startsWith("'")) {
@@ -261,18 +306,17 @@ class ApiService {
         String stopName = "Parada $stopId";
         final stopNameMatch = RegExp(r'class="ppp-stop-label">([^<]+)<', dotAll: true).firstMatch(body);
         if (stopNameMatch != null) {
-          stopName = stopNameMatch.group(1)!.trim();
-          // Remove "Parada XXX: " prefix for cleaner UI?
-          // Usually valid name is "Parada 210: Pintor..."
-          // Let's keep it as is but fixed case.
+          stopName = _decodeHtmlEntities(stopNameMatch.group(1)!.trim());
         }
 
         int index = 0;
         for (var match in lineMatches) {
-           String lineId = match.group(1)?.trim() ?? "?";
-           String lineName = (index < routeMatches.length) ? (routeMatches[index].group(1)?.trim() ?? "") : "";
-           String nextBus = (index < nextMatches.length) ? (nextMatches[index].group(1)?.trim() ?? "Sin servicio") : "Sin servicio";
-           String followBus = (index < followMatches.length) ? (followMatches[index].group(1)?.trim() ?? "-") : "-";
+           String lineId = _decodeHtmlEntities(match.group(1)?.trim() ?? "?");
+           String rawLineName = (index < routeMatches.length) ? (routeMatches[index].group(1)?.trim() ?? "") : "";
+           String lineName = _decodeHtmlEntities(rawLineName);
+           _log("LineName raw: '$rawLineName' -> decoded: '$lineName'");
+           String nextBus = (index < nextMatches.length) ? _decodeHtmlEntities(nextMatches[index].group(1)?.trim() ?? "Sin servicio") : "Sin servicio";
+           String followBus = (index < followMatches.length) ? _decodeHtmlEntities(followMatches[index].group(1)?.trim() ?? "-") : "-";
            
            projections.add(Estimation(
               stopId: stopId, 
@@ -339,5 +383,86 @@ class ApiService {
       }
     }
     return [];
+  }
+
+  // --- Smart Caching Methods ---
+
+  /// Returns true if the cache for [key] is valid (less than 30s old)
+  bool _isCacheValid(String key) {
+    final lastFetch = _lastFetchTime[key];
+    return lastFetch != null && DateTime.now().difference(lastFetch) < _cacheMaxAge;
+  }
+
+  /// Public method: Get estimations for a stop with smart caching.
+  /// First visit always fetches. Re-visits use cache if < 30 seconds.
+  Future<List<Estimation>> getStopEstimations(String stopId) async {
+    final cacheKey = 'stop_$stopId';
+    if (_isCacheValid(cacheKey) && _stopEstimationsCache.containsKey(cacheKey)) {
+      _log("Returning cached data for $cacheKey");
+      return _stopEstimationsCache[cacheKey]!;
+    }
+    // Fetch fresh data
+    final estimations = await fetchAllEstimationsForStop(stopId);
+    _stopEstimationsCache[cacheKey] = estimations;
+    _lastFetchTime[cacheKey] = DateTime.now();
+    return estimations;
+  }
+
+  /// Public method: Get estimations for a line's stops with smart caching.
+  /// [directionIndex] is used to differentiate cache for each direction.
+  Future<Map<String, Estimation?>> getLineEstimations(String lineId, int directionIndex, List<BusStop> stops) async {
+    final cacheKey = 'line_${lineId}_dir_$directionIndex';
+    if (_isCacheValid(cacheKey) && _lineEstimationsCache.containsKey(cacheKey)) {
+      _log("Returning cached data for $cacheKey");
+      return _lineEstimationsCache[cacheKey]!;
+    }
+    // Fetch fresh data in parallel
+    final List<Future<Estimation?>> futures = stops.map((stop) =>
+        fetchEstimation(stop.id, lineId, stop.label)).toList();
+    final results = await Future.wait(futures);
+
+    final estimations = <String, Estimation?>{};
+    for (var est in results) {
+      if (est != null) {
+        estimations[est.stopId] = est;
+      }
+    }
+    _lineEstimationsCache[cacheKey] = estimations;
+    _lastFetchTime[cacheKey] = DateTime.now();
+    return estimations;
+  }
+
+  /// Returns the DateTime of the last fetch for a given cache key, or null.
+  DateTime? getLastUpdateTime(String cacheKey) {
+    return _lastFetchTime[cacheKey];
+  }
+
+  /// Force refresh stop estimations, bypassing cache check but updating cache.
+  Future<List<Estimation>> forceRefreshStopEstimations(String stopId) async {
+    final cacheKey = 'stop_$stopId';
+    _log("Force refreshing $cacheKey");
+    final estimations = await fetchAllEstimationsForStop(stopId);
+    _stopEstimationsCache[cacheKey] = estimations;
+    _lastFetchTime[cacheKey] = DateTime.now();
+    return estimations;
+  }
+
+  /// Force refresh line estimations for a direction, bypassing cache check but updating cache.
+  Future<Map<String, Estimation?>> forceRefreshLineEstimations(String lineId, int directionIndex, List<BusStop> stops) async {
+    final cacheKey = 'line_${lineId}_dir_$directionIndex';
+    _log("Force refreshing $cacheKey");
+    final List<Future<Estimation?>> futures = stops.map((stop) =>
+        fetchEstimation(stop.id, lineId, stop.label)).toList();
+    final results = await Future.wait(futures);
+
+    final estimations = <String, Estimation?>{};
+    for (var est in results) {
+      if (est != null) {
+        estimations[est.stopId] = est;
+      }
+    }
+    _lineEstimationsCache[cacheKey] = estimations;
+    _lastFetchTime[cacheKey] = DateTime.now();
+    return estimations;
   }
 }

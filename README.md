@@ -1,6 +1,6 @@
 ![Header](assets/readme/cabecera.png)
 
-# <img src="assets/readme/logo.png" width="40" height="40"> Aucorsa Bus Córdoba
+# Aucorsa Bus Córdoba
 
 [![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
@@ -12,26 +12,27 @@ Real-time bus tracking and arrival estimations for the **Aucorsa** network in C�
 
 ---
 
-## ✨ Features
+## Features
 
-- 🚌 **Real-time Arrival Times**: Live estimations for all stops and lines.
-- 🎨 **Official Branding**: Strict professional white theme with official line color mapping.
-- 🌓 **Adaptive Theme**: High-contrast light and dark modes with centered headers.
-- ❤️ **Favorites**: Save your most-used stops for instant access from the side menu.
-- 🔍 **Smart Search**: Find any stop or line quickly with debounced autocomplete.
-- 🗺️ **Two-Way Routing**: Intelligent grouping of "Ida" and "Vuelta" (Outbound/Inbound) directions.
-
----
-
-## 🛠️ Technical Documentation
-
-This project includes extensive research on the Aucorsa API. Whether you are a developer looking to build your own tool or maintain this app, see the detailed mapping here:
-
-📄 **[AUCORSA_API.md](AUCORSA_API.md)** - Documentation of endpoints, nonce-based authentication, and data structures.
+- **Real-time Arrival Times**: Live estimations for all stops and lines.
+- **Premium UI**: Modern interface with Lucide icons, animated interactions, and official line branding.
+- **Localization**: Full support for Spanish and English languages, with automatic name correction for stops and lines.
+- **Adaptive Theme**: High-contrast light and dark modes.
+- **Favorites**: Save most-used stops for instant access.
+- **Smart Search**: Find any stop or line quickly with optimized search.
+- **Intelligent Routing**: Grouping of Outbound/Inbound directions for easier navigation.
 
 ---
 
-## 🚀 Getting Started
+## Technical Documentation
+
+This project includes research on the Aucorsa API. Whether you are a developer looking to build your own tool or maintain this app, see the detailed mapping here:
+
+**[AUCORSA_API.md](AUCORSA_API.md)** - Documentation of endpoints, nonce-based authentication, and data structures.
+
+---
+
+## Getting Started
 
 ### Prerequisites
 - [Flutter SDK](https://docs.flutter.dev/get-started/install)
@@ -60,14 +61,14 @@ You can download the latest stable release directly from the [GitHub Releases](h
 
 ---
 
-## 🔧 Research Tools
+## Research Tools
 The root directory contains PowerShell scripts used for the initial API reverse-engineering:
 - `Get-AucorsaEstimation.ps1`: Fetch estimations directly via CLI.
 - `Test-AllLines.ps1`: Validate all available lines.
 
 ---
 
-## ⚖️ License
+## License
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
