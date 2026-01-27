@@ -545,24 +545,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     l10n.noServiceAlerts,
                     style: const TextStyle(fontStyle: FontStyle.italic),
                   ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final uri = Uri.parse(alert.link);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    } else {
-                      debugPrint('Could not launch ${alert.link}');
-                    }
-                  },
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  label: Text(l10n.viewMore),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
               ],
             ),
           );
