@@ -10,11 +10,25 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  http: ^1.2.0
-  provider: ^6.1.1
+  # State Management (Cubit)
+  flutter_bloc: ^9.0.0
+  hydrated_bloc: ^10.0.0
+  equatable: ^2.0.7
+  # Networking
+  dio: ^5.7.0
+  # Navigation
+  go_router: ^17.0.0
+  # Storage
+  path_provider: ^2.1.5
   shared_preferences: ^2.5.4
+  # UI & Utils
   intl: any
   lucide_icons: ^0.257.0
+  google_fonts: ^6.1.0
+  # LEGACY (to be removed after migration)
+  http: ^1.2.0
+  provider: ^6.1.1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

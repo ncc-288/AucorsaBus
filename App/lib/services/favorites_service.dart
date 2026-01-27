@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 
 class FavoritesService {
-  static const String _favoritesKey = 'favorite_stops';
+  static const String _favoritesKey = 'favorite_line_stops'; // New key for new format
   
   // Cached SharedPreferences instance
   static SharedPreferences? _prefsInstance;
@@ -13,8 +13,8 @@ class FavoritesService {
     return _prefsInstance!;
   }
   
-  // Store favorites as a List of JSON Maps
-  Future<List<BusStop>> getFavorites() async {
+  /// Get all favorites as FavoriteItem list
+  Future<List<FavoriteItem>> getFavorites() async {
     final prefs = await _prefs;
     final List<String>? data = prefs.getStringList(_favoritesKey);
     
@@ -22,50 +22,56 @@ class FavoritesService {
     
     return data.map((item) {
       final Map<String, dynamic> jsonMap = json.decode(item);
-      return BusStop(
-        id: jsonMap['id'].toString(), 
-        label: jsonMap['label'].toString()
-      );
+      return FavoriteItem.fromJson(jsonMap);
     }).toList();
   }
 
-  Future<void> addFavorite(BusStop stop) async {
+  /// Add a favorite (Line, Stop) pair
+  Future<void> addFavorite(FavoriteItem item) async {
     final prefs = await _prefs;
     final List<String> current = prefs.getStringList(_favoritesKey) ?? [];
     
-    // Check duplication
-    bool exists = current.any((item) {
-      final Map<String, dynamic> jsonMap = json.decode(item);
-      return jsonMap['id'].toString() == stop.id;
+    // Check duplication by unique key
+    bool exists = current.any((stored) {
+      final Map<String, dynamic> jsonMap = json.decode(stored);
+      final storedItem = FavoriteItem.fromJson(jsonMap);
+      return storedItem.key == item.key;
     });
 
     if (!exists) {
-      final jsonStr = json.encode({'id': stop.id, 'label': stop.label});
+      final jsonStr = json.encode(item.toJson());
       current.add(jsonStr);
       await prefs.setStringList(_favoritesKey, current);
     }
   }
 
-  Future<void> removeFavorite(String stopId) async {
+  /// Remove a favorite by lineId and stopId
+  Future<void> removeFavorite(String lineId, String stopId) async {
     final prefs = await _prefs;
     final List<String> current = prefs.getStringList(_favoritesKey) ?? [];
+    final targetKey = '${lineId}_$stopId';
     
     current.removeWhere((item) {
       final Map<String, dynamic> jsonMap = json.decode(item);
-      return jsonMap['id'].toString() == stopId;
+      final storedItem = FavoriteItem.fromJson(jsonMap);
+      return storedItem.key == targetKey;
     });
     
     await prefs.setStringList(_favoritesKey, current);
   }
 
-  Future<bool> isFavorite(String stopId) async {
-     final prefs = await _prefs;
-     final List<String>? data = prefs.getStringList(_favoritesKey);
-     if (data == null) return false;
-     
-     return data.any((item) {
-       final Map<String, dynamic> jsonMap = json.decode(item);
-       return jsonMap['id'].toString() == stopId;
-     });
+  /// Check if a specific (Line, Stop) pair is a favorite
+  Future<bool> isFavorite(String lineId, String stopId) async {
+    final prefs = await _prefs;
+    final List<String>? data = prefs.getStringList(_favoritesKey);
+    if (data == null) return false;
+    
+    final targetKey = '${lineId}_$stopId';
+    
+    return data.any((item) {
+      final Map<String, dynamic> jsonMap = json.decode(item);
+      final storedItem = FavoriteItem.fromJson(jsonMap);
+      return storedItem.key == targetKey;
+    });
   }
 }

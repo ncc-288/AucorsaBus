@@ -21,10 +21,10 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
   String _stopName = "";
   List<Estimation> _estimations = [];
   bool _loading = true;
-  bool _isFavorite = false;
   final FavoritesService _favService = FavoritesService();
   final NameOverrideService _nameService = NameOverrideService();
   DateTime? _lastUpdateTime;
+  Set<String> _favoriteKeys = {}; // Keys in format 'lineId_stopId'
 
   // Auto-refresh timer
   Timer? _autoRefreshTimer;
@@ -37,7 +37,7 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
     super.initState();
     // Use name override if available
     _stopName = _nameService.getStopName(widget.stop.id, widget.stop.label);
-    _checkFavorite();
+    _loadFavorites();
     _loadEstimations();
     _startAutoRefresh();
   }
@@ -58,6 +58,39 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
     );
   }
 
+  Future<void> _loadFavorites() async {
+    final favs = await _favService.getFavorites();
+    if (mounted) {
+      setState(() {
+        _favoriteKeys = favs.map((f) => f.key).toSet();
+      });
+    }
+  }
+
+  String _getFavoriteKey(String lineId) => '${lineId}_${widget.stop.id}';
+
+  Future<void> _toggleFavorite(Estimation est) async {
+    final lineId = est.lineId ?? '?';
+    final key = _getFavoriteKey(lineId);
+    
+    if (_favoriteKeys.contains(key)) {
+      await _favService.removeFavorite(lineId, widget.stop.id);
+      setState(() {
+        _favoriteKeys.remove(key);
+      });
+    } else {
+      await _favService.addFavorite(FavoriteItem(
+        stopId: widget.stop.id,
+        stopLabel: _stopName,
+        lineId: lineId,
+        lineLabel: est.lineName ?? '',
+      ));
+      setState(() {
+        _favoriteKeys.add(key);
+      });
+    }
+  }
+
   /// Force refresh bypassing cache
   Future<void> _forceRefresh() async {
     if (!mounted) return;
@@ -76,22 +109,6 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
         }
       });
     }
-  }
-
-  Future<void> _checkFavorite() async {
-    final isFav = await _favService.isFavorite(widget.stop.id);
-    if (mounted) {
-      setState(() => _isFavorite = isFav);
-    }
-  }
-
-  Future<void> _toggleFavorite() async {
-    if (_isFavorite) {
-      await _favService.removeFavorite(widget.stop.id);
-    } else {
-      await _favService.addFavorite(BusStop(id: widget.stop.id, label: _stopName));
-    }
-    _checkFavorite();
   }
 
   Future<void> _loadEstimations() async {
@@ -137,13 +154,7 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
         title: Text(_stopName),
         elevation: 0,
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(_isFavorite ? Icons.favorite : Icons.favorite_border),
-            color: _isFavorite ? Colors.red : Theme.of(context).colorScheme.primary,
-            onPressed: _toggleFavorite,
-          ),
-        ],
+        // Removed global favorite button - now per-line
       ),
       body: Column(
         children: [
@@ -191,6 +202,9 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
                       itemCount: _estimations.length,
                       itemBuilder: (context, index) {
                         final est = _estimations[index];
+                        final lineId = est.lineId ?? '?';
+                        final isFav = _favoriteKeys.contains(_getFavoriteKey(lineId));
+                        
                         return Card(
                           child: ListTile(
                             leading: CircleAvatar(
@@ -205,6 +219,11 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
                                 Text("${l10n.nextBus}: ${est.nextBus}", style: const TextStyle(fontWeight: FontWeight.bold)),
                                 Text("${l10n.followingBus}: ${est.followingBus}"),
                               ],
+                            ),
+                            trailing: IconButton(
+                              icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
+                              color: isFav ? Colors.red : Colors.grey,
+                              onPressed: () => _toggleFavorite(est),
                             ),
                           ),
                         );

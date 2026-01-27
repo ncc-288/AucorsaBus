@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -56,7 +57,28 @@ class AucorsaApp extends StatelessWidget {
   const AucorsaApp({super.key});
 
   // Professional teal/green as primary accent
-  static const Color _primaryColor = Color(0xFF00A99D); 
+  static const Color _primaryColor = Color(0xFF00A99D);
+  
+  // Helper to apply medium weight to a TextTheme
+  static TextTheme _applyMediumWeight(TextTheme base) {
+    return base.copyWith(
+      displayLarge: base.displayLarge?.copyWith(fontWeight: FontWeight.w500),
+      displayMedium: base.displayMedium?.copyWith(fontWeight: FontWeight.w500),
+      displaySmall: base.displaySmall?.copyWith(fontWeight: FontWeight.w500),
+      headlineLarge: base.headlineLarge?.copyWith(fontWeight: FontWeight.w500),
+      headlineMedium: base.headlineMedium?.copyWith(fontWeight: FontWeight.w500),
+      headlineSmall: base.headlineSmall?.copyWith(fontWeight: FontWeight.w500),
+      titleLarge: base.titleLarge?.copyWith(fontWeight: FontWeight.w500),
+      titleMedium: base.titleMedium?.copyWith(fontWeight: FontWeight.w500),
+      titleSmall: base.titleSmall?.copyWith(fontWeight: FontWeight.w500),
+      bodyLarge: base.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+      bodyMedium: base.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+      bodySmall: base.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+      labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w500),
+      labelMedium: base.labelMedium?.copyWith(fontWeight: FontWeight.w500),
+      labelSmall: base.labelSmall?.copyWith(fontWeight: FontWeight.w500),
+    );
+  } 
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +104,7 @@ class AucorsaApp extends StatelessWidget {
       
       // Light Theme - Strictly White and Professional
       theme: ThemeData(
+        textTheme: _applyMediumWeight(GoogleFonts.nunitoTextTheme()),
         colorScheme: ColorScheme.fromSeed(
           seedColor: _primaryColor,
           brightness: Brightness.light,
@@ -117,6 +140,7 @@ class AucorsaApp extends StatelessWidget {
       
       // Dark Theme - Clean and High Contrast
       darkTheme: ThemeData(
+        textTheme: _applyMediumWeight(GoogleFonts.nunitoTextTheme(ThemeData.dark().textTheme)),
         colorScheme: ColorScheme.fromSeed(
           seedColor: _primaryColor,
           brightness: Brightness.dark,

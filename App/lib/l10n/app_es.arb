@@ -22,5 +22,8 @@
   "noStopsFound": "No se encontraron paradas.",
   "minutes": "minutos",
   "minute": "minuto",
-  "now": "ahora"
+  "now": "ahora",
+  "serviceStatus": "Estado",
+  "noServiceAlerts": "No hay avisos de servicio.",
+  "viewMore": "Ver más"
 }

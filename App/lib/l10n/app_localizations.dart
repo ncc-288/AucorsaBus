@@ -235,6 +235,24 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'ahora'**
   String get now;
+
+  /// No description provided for @serviceStatus.
+  ///
+  /// In es, this message translates to:
+  /// **'Estado'**
+  String get serviceStatus;
+
+  /// No description provided for @noServiceAlerts.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay avisos de servicio.'**
+  String get noServiceAlerts;
+
+  /// No description provided for @viewMore.
+  ///
+  /// In es, this message translates to:
+  /// **'Ver más'**
+  String get viewMore;
 }
 
 class _AppLocalizationsDelegate

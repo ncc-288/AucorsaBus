@@ -465,4 +465,49 @@ class ApiService {
     _lastFetchTime[cacheKey] = DateTime.now();
     return estimations;
   }
+
+  // Cache for service alerts
+  List<ServiceAlert>? _cachedServiceAlerts;
+  DateTime? _serviceAlertsLastFetch;
+  static const Duration _serviceAlertsCacheAge = Duration(minutes: 5);
+
+  /// Fetch service alerts/incidents from the WordPress REST API
+  Future<List<ServiceAlert>> fetchServiceAlerts({bool forceRefresh = false}) async {
+    // Return cached data if valid
+    if (!forceRefresh && 
+        _cachedServiceAlerts != null && 
+        _serviceAlertsLastFetch != null &&
+        DateTime.now().difference(_serviceAlertsLastFetch!) < _serviceAlertsCacheAge) {
+      _log("Returning cached service alerts");
+      return _cachedServiceAlerts!;
+    }
+
+    try {
+      const targetUrl = 'https://aucorsa.es/wp-json/wp/v2/estado-del-servicio';
+      final url = kIsWeb 
+          ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}') 
+          : Uri.parse(targetUrl);
+      
+      _log("Fetching service alerts from: $url");
+      final response = await http.get(url);
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = json.decode(response.body);
+        final alerts = jsonList.map((item) => ServiceAlert.fromJson(item)).toList();
+        
+        // Update cache
+        _cachedServiceAlerts = alerts;
+        _serviceAlertsLastFetch = DateTime.now();
+        
+        _log("Fetched ${alerts.length} service alerts");
+        return alerts;
+      } else {
+        _log("Error fetching service alerts: ${response.statusCode}");
+        return _cachedServiceAlerts ?? [];
+      }
+    } catch (e) {
+      _log("Exception fetching service alerts: $e");
+      return _cachedServiceAlerts ?? [];
+    }
+  }
 }

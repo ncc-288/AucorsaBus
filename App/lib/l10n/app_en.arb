@@ -22,5 +22,8 @@
   "noStopsFound": "No stops found.",
   "minutes": "minutes",
   "minute": "minute",
-  "now": "now"
+  "now": "now",
+  "serviceStatus": "Status",
+  "noServiceAlerts": "No service alerts.",
+  "viewMore": "View more"
 }

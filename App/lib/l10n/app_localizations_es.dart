@@ -76,4 +76,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get now => 'ahora';
+
+  @override
+  String get serviceStatus => 'Estado';
+
+  @override
+  String get noServiceAlerts => 'No hay avisos de servicio.';
+
+  @override
+  String get viewMore => 'Ver más';
 }

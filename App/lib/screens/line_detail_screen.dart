@@ -41,7 +41,7 @@ class _LineDetailScreenState extends State<LineDetailScreen> {
   DateTime? get _lastUpdateTime => _lastUpdateTimeByDirection[_selectedDirIndex];
   
   final FavoritesService _favService = FavoritesService();
-  Set<String> _favoriteIds = {};
+  Set<String> _favoriteKeys = {}; // Keys in format 'lineId_stopId'
 
   String _getCacheKey(int dirIndex) => 'line_${widget.line.id}_dir_$dirIndex';
 
@@ -88,21 +88,32 @@ class _LineDetailScreenState extends State<LineDetailScreen> {
     final favs = await _favService.getFavorites();
     if (mounted) {
       setState(() {
-        _favoriteIds = favs.map((f) => f.id).toSet();
+        _favoriteKeys = favs.map((f) => f.key).toSet();
       });
     }
   }
 
+  String _getFavoriteKey(String stopId) => '${widget.line.label.split('ㅤ')[0].trim()}_$stopId';
+
   Future<void> _toggleFavorite(BusStop stop) async {
-    if (_favoriteIds.contains(stop.id)) {
-      await _favService.removeFavorite(stop.id);
+    final lineDisplayId = widget.line.label.split('ㅤ')[0].trim();
+    final lineLabel = (widget.line.label.contains('ㅤ') ? widget.line.label.substring(widget.line.label.indexOf('ㅤ') + 1) : widget.line.label).trim();
+    final key = _getFavoriteKey(stop.id);
+    
+    if (_favoriteKeys.contains(key)) {
+      await _favService.removeFavorite(lineDisplayId, stop.id);
       setState(() {
-        _favoriteIds.remove(stop.id);
+        _favoriteKeys.remove(key);
       });
     } else {
-      await _favService.addFavorite(stop);
+      await _favService.addFavorite(FavoriteItem(
+        stopId: stop.id,
+        stopLabel: stop.label,
+        lineId: lineDisplayId,
+        lineLabel: lineLabel,
+      ));
       setState(() {
-        _favoriteIds.add(stop.id);
+        _favoriteKeys.add(key);
       });
     }
   }
@@ -254,7 +265,7 @@ class _LineDetailScreenState extends State<LineDetailScreen> {
                         final stops = _directions[_selectedDirIndex].stops;
                         final stop = stops[index];
                         final est = _estimations[stop.id];
-                        final isFav = _favoriteIds.contains(stop.id);
+                        final isFav = _favoriteKeys.contains(_getFavoriteKey(stop.id));
                         final isLast = index == stops.length - 1;
 
                         // Apply name override if available
@@ -274,7 +285,7 @@ class _LineDetailScreenState extends State<LineDetailScreen> {
                                 leading: CircleAvatar(
                                   backgroundColor: lineColor,
                                   foregroundColor: Colors.white,
-                                  child: Text(stop.id, style: const TextStyle(fontSize: 10, color: Colors.white)),
+                                  child: Text(stop.id, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
                                 ),
                                 title: Text(displayStopName, style: const TextStyle(fontWeight: FontWeight.bold)),
                                 subtitle: est == null 
