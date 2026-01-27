@@ -52,7 +52,6 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
     _autoRefreshTimer = Timer.periodic(
       Duration(seconds: _autoRefreshSeconds),
       (_) {
-        print("[StopDetailScreen] Auto-refresh timer fired at ${DateTime.now()}");
         _forceRefresh();
       },
     );
