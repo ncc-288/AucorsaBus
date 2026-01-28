@@ -5,7 +5,7 @@
   "lines": "Lines",
   "stops": "Stops",
   "search": "Search",
-  "searchHint": "Search stop or line...",
+  "searchHint": "Search stop...",
   "nextBus": "Next",
   "followingBus": "Following",
   "noService": "No service",
@@ -27,5 +27,10 @@
   "noServiceAlerts": "No service alerts.",
   "viewMore": "View more",
   "newVersionAvailable": "New version available",
-  "download": "Download"
+  "download": "Download",
+  "editFavorite": "Edit Favorite",
+  "stopName": "Stop Name",
+  "lineName": "Line Name",
+  "cancel": "Cancel",
+  "save": "Save"
 }

@@ -11,6 +11,7 @@ class FavoritesDashboard extends StatelessWidget {
   final DateTime? lastUpdateTime;
   final VoidCallback onRefresh;
   final Future<void> Function(String lineId, String stopId) onRemove;
+  final Future<void> Function(FavoriteItem item) onUpdate;
 
   const FavoritesDashboard({
     super.key,
@@ -19,6 +20,7 @@ class FavoritesDashboard extends StatelessWidget {
     required this.lastUpdateTime,
     required this.onRefresh,
     required this.onRemove,
+    required this.onUpdate,
   });
 
   String _formatLastUpdate(AppLocalizations l10n) {
@@ -80,9 +82,11 @@ class FavoritesDashboard extends StatelessWidget {
                 final est = estimations[fav.key];
 
                 return _FavoriteCard(
+                  key: ValueKey(fav.key), // Proper key for list items
                   favorite: fav,
                   estimation: est,
                   onRemove: () => onRemove(fav.lineId, fav.stopId),
+                  onUpdate: onUpdate,
                 );
               },
             ),
@@ -98,15 +102,81 @@ class _FavoriteCard extends StatelessWidget {
   final FavoriteItem favorite;
   final Estimation? estimation;
   final VoidCallback onRemove;
+  final Future<void> Function(FavoriteItem item) onUpdate;
 
   const _FavoriteCard({
+    super.key,
     required this.favorite,
     required this.estimation,
     required this.onRemove,
+    required this.onUpdate,
   });
+
+  void _showEditDialog(BuildContext context) {
+    final stopController = TextEditingController(text: favorite.customStopName ?? favorite.stopLabel);
+    final lineController = TextEditingController(text: favorite.customLineName ?? favorite.lineLabel);
+    final l10n = AppLocalizations.of(context)!;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.editFavorite),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+             TextField(
+               controller: stopController,
+               decoration: InputDecoration(
+                 labelText: l10n.stopName,
+                 hintText: favorite.stopLabel,
+               ),
+             ),
+             const SizedBox(height: 16),
+             TextField(
+               controller: lineController,
+               decoration: InputDecoration(
+                 labelText: l10n.lineName,
+                 hintText: favorite.lineLabel,
+               ),
+             ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(l10n.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newStopName = stopController.text.trim();
+              final newLineName = lineController.text.trim();
+              
+              final updated = FavoriteItem(
+                stopId: favorite.stopId,
+                stopLabel: favorite.stopLabel,
+                lineId: favorite.lineId,
+                lineLabel: favorite.lineLabel,
+                customStopName: newStopName.isNotEmpty && newStopName != favorite.stopLabel ? newStopName : null,
+                customLineName: newLineName.isNotEmpty && newLineName != favorite.lineLabel ? newLineName : null,
+              );
+              
+              onUpdate(updated);
+              Navigator.pop(dialogContext);
+            },
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Determine which line label to show: Custom > API Estimation > Stored Original
+    final displayLineLabel = favorite.customLineName ?? 
+                             estimation?.lineName ?? 
+                             favorite.lineLabel;
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
       child: Padding(
@@ -130,14 +200,14 @@ class _FavoriteCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    favorite.stopLabel,
+                    favorite.customStopName ?? favorite.stopLabel,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    favorite.lineLabel,
+                    displayLineLabel,
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
@@ -175,10 +245,21 @@ class _FavoriteCard extends StatelessWidget {
                   ),
               ],
             ),
-            // Delete button
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: onRemove,
+            // Actions
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  onPressed: () => _showEditDialog(context),
+                  tooltip: 'Edit', 
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  onPressed: onRemove,
+                  tooltip: 'Delete',
+                ),
+              ],
             ),
           ],
         ),

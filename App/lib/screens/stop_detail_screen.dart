@@ -7,6 +7,8 @@ import '../services/api_service.dart';
 import '../services/favorites_service.dart';
 import '../services/line_color_service.dart';
 import '../services/name_override_service.dart';
+import '../widgets/floating_search_bar.dart';
+import 'search_delegate.dart';
 
 class StopDetailScreen extends StatefulWidget {
   final BusStop stop;
@@ -144,93 +146,113 @@ class _StopDetailScreenState extends State<StopDetailScreen> {
     return _nameService.getLineName(lineName, lineName);
   }
 
+  Future<void> _openSearch() async {
+    final api = Provider.of<ApiService>(context, listen: false);
+    final result = await showSearch(
+      context: context,
+      delegate: StopSearchDelegate(api),
+    );
+
+    if (result != null && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => StopDetailScreen(stop: result)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_stopName),
-        elevation: 0,
-        centerTitle: true,
-        // Removed global favorite button - now per-line
-      ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            color: Theme.of(context).brightness == Brightness.light 
-                ? const Color(0xFFF9F9F9) 
-                : const Color(0xFF1E1E1E),
-            width: double.infinity,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _stopName, 
-                  style: const TextStyle(
-                    color: Color(0xFF2D2D2D), 
-                    fontSize: 22, 
-                    fontWeight: FontWeight.bold
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "${l10n.stopCode}: ${widget.stop.id}",
-                  style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w500),
-                ),
-                if (_lastUpdateTime != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _formatLastUpdate(l10n),
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
-                  ),
-                ]
-              ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Floating Search Bar with Back Button
+            FloatingSearchBar.withBackButton(
+              onTap: _openSearch,
+              onLeadingTap: () => Navigator.pop(context),
             ),
-          ),
-          Expanded(
-            child: _loading 
-              ? const Center(child: CircularProgressIndicator())
-              : _estimations.isEmpty
-                ? Center(child: Text(l10n.noEstimations))
-                : RefreshIndicator(
-                    onRefresh: _forceRefresh,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: _estimations.length,
-                      itemBuilder: (context, index) {
-                        final est = _estimations[index];
-                        final lineId = est.lineId ?? '?';
-                        final isFav = _favoriteKeys.contains(_getFavoriteKey(lineId));
-                        
-                        return Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                               backgroundColor: LineColorService.getColor(est.lineId),
-                               foregroundColor: Colors.white,
-                               child: Text(est.lineId ?? "?", style: const TextStyle(fontWeight: FontWeight.bold)), 
-                            ),
-                            title: Text(_fixLineName(est.lineName)),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text("${l10n.nextBus}: ${est.nextBus}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                                Text("${l10n.followingBus}: ${est.followingBus}"),
-                              ],
-                            ),
-                            trailing: IconButton(
-                              icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
-                              color: isFav ? Colors.red : Colors.grey,
-                              onPressed: () => _toggleFavorite(est),
-                            ),
-                          ),
-                        );
-                      },
+            // Stop Info Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              color: Theme.of(context).brightness == Brightness.light 
+                  ? const Color(0xFFF9F9F9) 
+                  : const Color(0xFF1E1E1E),
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _stopName, 
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.light 
+                          ? const Color(0xFF2D2D2D) 
+                          : Colors.white,
+                      fontSize: 22, 
+                      fontWeight: FontWeight.bold
                     ),
                   ),
-          ),
-        ],
+                  const SizedBox(height: 4),
+                  Text(
+                    "${l10n.stopCode}: ${widget.stop.id}",
+                    style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w500),
+                  ),
+                  if (_lastUpdateTime != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _formatLastUpdate(l10n),
+                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                    ),
+                  ]
+                ],
+              ),
+            ),
+            // Estimations List
+            Expanded(
+              child: _loading 
+                ? const Center(child: CircularProgressIndicator())
+                : _estimations.isEmpty
+                  ? Center(child: Text(l10n.noEstimations))
+                  : RefreshIndicator(
+                      onRefresh: _forceRefresh,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(8),
+                        itemCount: _estimations.length,
+                        itemBuilder: (context, index) {
+                          final est = _estimations[index];
+                          final lineId = est.lineId ?? '?';
+                          final isFav = _favoriteKeys.contains(_getFavoriteKey(lineId));
+                          
+                          return Card(
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                 backgroundColor: LineColorService.getColor(est.lineId),
+                                 foregroundColor: Colors.white,
+                                 child: Text(est.lineId ?? "?", style: const TextStyle(fontWeight: FontWeight.bold)), 
+                              ),
+                              title: Text(_fixLineName(est.lineName)),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("${l10n.nextBus}: ${est.nextBus}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  Text("${l10n.followingBus}: ${est.followingBus}"),
+                                ],
+                              ),
+                              trailing: IconButton(
+                                icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
+                                color: isFav ? Colors.red : Colors.grey,
+                                onPressed: () => _toggleFavorite(est),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

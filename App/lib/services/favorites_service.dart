@@ -45,6 +45,23 @@ class FavoritesService {
     }
   }
 
+  /// Update an existing favorite (e.g. rename)
+  Future<void> updateFavorite(FavoriteItem updatedItem) async {
+    final prefs = await _prefs;
+    final List<String> current = prefs.getStringList(_favoritesKey) ?? [];
+    
+    final index = current.indexWhere((item) {
+      final Map<String, dynamic> jsonMap = json.decode(item);
+      final storedItem = FavoriteItem.fromJson(jsonMap);
+      return storedItem.key == updatedItem.key;
+    });
+
+    if (index != -1) {
+      current[index] = json.encode(updatedItem.toJson());
+      await prefs.setStringList(_favoritesKey, current);
+    }
+  }
+
   /// Remove a favorite by lineId and stopId
   Future<void> removeFavorite(String lineId, String stopId) async {
     final prefs = await _prefs;

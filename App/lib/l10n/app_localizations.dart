@@ -131,7 +131,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchHint.
   ///
   /// In es, this message translates to:
-  /// **'Buscar parada o línea...'**
+  /// **'Buscar parada...'**
   String get searchHint;
 
   /// No description provided for @nextBus.
@@ -265,6 +265,36 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Descargar'**
   String get download;
+
+  /// No description provided for @editFavorite.
+  ///
+  /// In es, this message translates to:
+  /// **'Editar Favorito'**
+  String get editFavorite;
+
+  /// No description provided for @stopName.
+  ///
+  /// In es, this message translates to:
+  /// **'Nombre de Parada'**
+  String get stopName;
+
+  /// No description provided for @lineName.
+  ///
+  /// In es, this message translates to:
+  /// **'Nombre de Línea'**
+  String get lineName;
+
+  /// No description provided for @cancel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar'**
+  String get cancel;
+
+  /// No description provided for @save.
+  ///
+  /// In es, this message translates to:
+  /// **'Guardar'**
+  String get save;
 }
 
 class _AppLocalizationsDelegate

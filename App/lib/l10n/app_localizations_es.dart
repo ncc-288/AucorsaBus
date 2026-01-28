@@ -24,7 +24,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get search => 'Buscar';
 
   @override
-  String get searchHint => 'Buscar parada o línea...';
+  String get searchHint => 'Buscar parada...';
 
   @override
   String get nextBus => 'Próximo';
@@ -91,4 +91,19 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get download => 'Descargar';
+
+  @override
+  String get editFavorite => 'Editar Favorito';
+
+  @override
+  String get stopName => 'Nombre de Parada';
+
+  @override
+  String get lineName => 'Nombre de Línea';
+
+  @override
+  String get cancel => 'Cancelar';
+
+  @override
+  String get save => 'Guardar';
 }

@@ -50,12 +50,16 @@ class FavoriteItem {
   final String stopLabel;
   final String lineId;
   final String lineLabel;
+  final String? customStopName;
+  final String? customLineName;
 
   FavoriteItem({
     required this.stopId,
     required this.stopLabel,
     required this.lineId,
     required this.lineLabel,
+    this.customStopName,
+    this.customLineName,
   });
 
   /// Unique key for this favorite
@@ -66,6 +70,8 @@ class FavoriteItem {
     'stopLabel': stopLabel,
     'lineId': lineId,
     'lineLabel': lineLabel,
+    'customStopName': customStopName,
+    'customLineName': customLineName,
   };
 
   factory FavoriteItem.fromJson(Map<String, dynamic> json) {
@@ -74,6 +80,8 @@ class FavoriteItem {
       stopLabel: json['stopLabel']?.toString() ?? '',
       lineId: json['lineId']?.toString() ?? '',
       lineLabel: json['lineLabel']?.toString() ?? '',
+      customStopName: json['customStopName']?.toString(),
+      customLineName: json['customLineName']?.toString(),
     );
   }
 }

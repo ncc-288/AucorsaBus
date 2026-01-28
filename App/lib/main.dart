@@ -13,6 +13,9 @@ import 'services/name_override_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Allow runtime font fetching for Android reliability
+  GoogleFonts.config.allowRuntimeFetching = true;
+  
   // Initialize name override service
   await NameOverrideService().initialize();
   
@@ -107,7 +110,7 @@ class AucorsaApp extends StatelessWidget {
       
       // Light Theme - Strictly White and Professional
       theme: ThemeData(
-        textTheme: _applyMediumWeight(GoogleFonts.nunitoTextTheme()),
+        textTheme: _applyMediumWeight(GoogleFonts.openSansTextTheme()),
         colorScheme: ColorScheme.fromSeed(
           seedColor: _primaryColor,
           brightness: Brightness.light,
@@ -143,7 +146,7 @@ class AucorsaApp extends StatelessWidget {
       
       // Dark Theme - Clean and High Contrast
       darkTheme: ThemeData(
-        textTheme: _applyMediumWeight(GoogleFonts.nunitoTextTheme(ThemeData.dark().textTheme)),
+        textTheme: _applyMediumWeight(GoogleFonts.openSansTextTheme(ThemeData.dark().textTheme)),
         colorScheme: ColorScheme.fromSeed(
           seedColor: _primaryColor,
           brightness: Brightness.dark,

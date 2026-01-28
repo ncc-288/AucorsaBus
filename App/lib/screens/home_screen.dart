@@ -9,12 +9,14 @@ import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/favorites_service.dart';
 import '../services/theme_service.dart';
+import '../services/alert_read_service.dart';
 import '../main.dart';
 import 'stop_detail_screen.dart';
 import 'search_delegate.dart';
 import '../services/update_service.dart';
 import '../widgets/lines_list.dart';
 import '../widgets/favorites_dashboard.dart';
+import '../widgets/floating_search_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,16 +36,30 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   String? _errorMessage;
   final FavoritesService _favService = FavoritesService();
+  final AlertReadService _alertReadService = AlertReadService();
+  
+  // Unread alerts count for badge
+  int _unreadAlertCount = 0;
+  Set<int> _readAlertIds = {};
   
   // Auto-refresh timer for favorites
   Timer? _autoRefreshTimer;
   static const int _autoRefreshSeconds = 30;
   DateTime? _lastUpdateTime;
 
+  // Periodic alert refresh timer (60 minutes)
+  Timer? _alertRefreshTimer;
+  static const int _alertRefreshMinutes = 60;
+
+  // GlobalKey for Scaffold to control drawer
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   @override
   void initState() {
     super.initState();
     _loadLines();
+    _loadServiceAlerts(); // Load alerts immediately to show badge
+    _startAlertRefreshTimer(); // Start periodic alert refresh
     _checkForUpdates();
   }
 
@@ -76,7 +92,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    _alertRefreshTimer?.cancel();
     super.dispose();
+  }
+
+  void _startAlertRefreshTimer() {
+    _alertRefreshTimer = Timer.periodic(
+      Duration(minutes: _alertRefreshMinutes),
+      (_) => _loadServiceAlerts(),
+    );
   }
 
   void _startAutoRefresh() {
@@ -159,24 +183,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadServiceAlerts() async {
-    setState(() => _loading = true);
+    // Only set loading state if we're on the Status tab
+    final isStatusTab = _selectedIndex == 2;
+    if (isStatusTab) {
+      setState(() => _loading = true);
+    }
     try {
       final api = Provider.of<ApiService>(context, listen: false);
       final alerts = await api.fetchServiceAlerts();
       if (mounted) {
+        // Calculate unread count
+        final unreadCount = await _alertReadService.getUnreadCount(alerts);
+        final readIds = await _alertReadService.getReadAlertIds();
         setState(() {
           _serviceAlerts = alerts;
-          _loading = false;
+          _unreadAlertCount = unreadCount;
+          _readAlertIds = readIds;
+          if (isStatusTab) {
+            _loading = false;
+          }
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _errorMessage = "Error: $e";
-          _loading = false;
+          if (isStatusTab) {
+            _loading = false;
+          }
         });
       }
     }
+  }
+
+  Future<void> _updateUnreadCount() async {
+    final unreadCount = await _alertReadService.getUnreadCount(_serviceAlerts);
+    if (mounted) {
+      setState(() => _unreadAlertCount = unreadCount);
+    }
+  }
+
+  Future<void> _markAlertAsRead(int alertId) async {
+    await _alertReadService.markAsRead(alertId);
+    setState(() {
+      _readAlertIds.add(alertId);
+    });
+    await _updateUnreadCount();
   }
 
   Future<void> _openSearch() async {
@@ -197,147 +249,183 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final titles = ['Aucorsa - ${l10n.lines}', l10n.favorites, l10n.serviceStatus];
-    final title = titles[_selectedIndex];
     
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        elevation: 0,
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: _openSearch,
-            tooltip: l10n.search,
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
+      key: _scaffoldKey,
+      drawer: _buildDrawer(l10n),
+      body: SafeArea(
+        child: Column(
           children: [
-             DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.light 
-                    ? Colors.white 
-                    : const Color(0xFF1E1E1E),
-                border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                   Image.asset(
-                     'assets/images/logo.png',
-                     height: 60,
-                   ),
-                   const SizedBox(height: 10),
-                   Text(
-                     l10n.appTitle, 
-                     style: const TextStyle(
-                       color: Color(0xFF00A99D), 
-                       fontSize: 22, 
-                       fontWeight: FontWeight.bold
-                     )
-                   ),
-                ],
-              ),
+            // Floating Search Bar (Gmail-style)
+            FloatingSearchBar(
+              onTap: _openSearch,
+              onLeadingTap: () => _scaffoldKey.currentState?.openDrawer(),
             ),
-            // Settings Section
-            Consumer<ThemeService>(
-              builder: (context, themeService, child) {
-                return ListTile(
-                  leading: Icon(themeService.themeModeIcon),
-                  title: Text(l10n.settings),
-                  subtitle: Text(themeService.themeModeLabel),
-                  onTap: () {
-                    themeService.toggleTheme();
-                  },
-                );
-              },
-            ),
-            const Divider(),
-            // Language selector
-            Consumer<LocaleService>(
-              builder: (context, localeService, child) {
-                final currentLang = localeService.locale.languageCode;
-                return ExpansionTile(
-                  leading: const Icon(Icons.language),
-                  title: Text(l10n.language),
-                  children: [
-                    RadioListTile<String>(
-                      value: 'es',
-                      groupValue: currentLang,
-                      title: Text(l10n.spanish),
-                      onChanged: (value) {
-                        if (value != null) {
-                          localeService.setLocale(Locale(value));
-                        }
-                      },
-                    ),
-                    RadioListTile<String>(
-                      value: 'en',
-                      groupValue: currentLang,
-                      title: Text(l10n.english),
-                      onChanged: (value) {
-                        if (value != null) {
-                          localeService.setLocale(Locale(value));
-                        }
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-            const Divider(),
-            // GitHub Repository Link
-            ListTile(
-              leading: const Icon(Icons.code),
-              title: const Text('GitHub'),
-              subtitle: const Text('ncc-288/AucorsaBus'),
-              onTap: () async {
-                final uri = Uri.parse('https://github.com/ncc-288/AucorsaBus');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
+            // Main Content
+            Expanded(
+              child: _loading 
+                ? const Center(child: CircularProgressIndicator()) 
+                : _selectedIndex == 0 
+                   ? LinesList(lines: _lines, errorMessage: _errorMessage)
+                   : _selectedIndex == 1
+                      ? FavoritesDashboard(
+                          favorites: _favorites,
+                          estimations: _favEstimations,
+                          lastUpdateTime: _lastUpdateTime,
+                          onRefresh: _refreshFavoriteEstimations,
+                          onRemove: (lineId, stopId) async {
+                            await _favService.removeFavorite(lineId, stopId);
+                            _loadFavorites();
+                          },
+                          onUpdate: (item) async {
+                            await _favService.updateFavorite(item);
+                            _loadFavorites();
+                          },
+                        )
+                      : _buildStatusTab(l10n),
             ),
           ],
         ),
       ),
-      body: _loading 
-        ? const Center(child: CircularProgressIndicator()) 
-        : _selectedIndex == 0 
-           ? LinesList(lines: _lines, errorMessage: _errorMessage)
-           : _selectedIndex == 1
-              ? FavoritesDashboard(
-                  favorites: _favorites,
-                  estimations: _favEstimations,
-                  lastUpdateTime: _lastUpdateTime,
-                  onRefresh: _refreshFavoriteEstimations,
-                  onRemove: (lineId, stopId) async {
-                    await _favService.removeFavorite(lineId, stopId);
-                    _loadFavorites();
-                  },
-                )
-              : _buildStatusTab(l10n),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.directions_bus),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _onItemTapped,
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.directions_bus_outlined),
+            selectedIcon: const Icon(Icons.directions_bus),
             label: l10n.lines,
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.favorite),
+          NavigationDestination(
+            icon: const Icon(Icons.favorite_outline),
+            selectedIcon: const Icon(Icons.favorite),
             label: l10n.favorites,
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.info_outline),
+          NavigationDestination(
+            icon: _buildBadgedIcon(Icons.info_outline, _unreadAlertCount),
+            selectedIcon: _buildBadgedIcon(Icons.info, _unreadAlertCount),
             label: l10n.serviceStatus,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Custom responsive badge to avoid clipping and ensure compact size
+  Widget _buildBadgedIcon(IconData iconData, int count) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(iconData),
+        if (count > 0)
+          Positioned(
+            right: -8, // Push slightly outside to the right
+            top: -4,   // Push slightly up
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFB3261E), // Material 3 Error
+                borderRadius: BorderRadius.circular(10), // Pill shape
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 16, // Ensure a nice circle for single digits
+                minHeight: 16,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  height: 1.0, // Tight line height
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDrawer(AppLocalizations l10n) {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Text(
+                l10n.appTitle,
+                style: const TextStyle(
+                  color: Color(0xFFB3261E), // Red color like Gmail
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500, // Medium weight
+                ),
+              ),
+            ),
+          ),
+          const Divider(indent: 0, endIndent: 0, height: 1),
+          const SizedBox(height: 8),
+          // Settings Section
+          Consumer<ThemeService>(
+            builder: (context, themeService, child) {
+              return ListTile(
+                leading: Icon(themeService.themeModeIcon),
+                title: Text(l10n.settings),
+                subtitle: Text(themeService.themeModeLabel),
+                onTap: () {
+                  themeService.toggleTheme();
+                },
+              );
+            },
+          ),
+          const Divider(),
+          // Language selector
+          Consumer<LocaleService>(
+            builder: (context, localeService, child) {
+              final currentLang = localeService.locale.languageCode;
+              return ExpansionTile(
+                leading: const Icon(Icons.language),
+                title: Text(l10n.language),
+                children: [
+                  RadioListTile<String>(
+                    value: 'es',
+                    groupValue: currentLang,
+                    title: Text(l10n.spanish),
+                    onChanged: (value) {
+                      if (value != null) {
+                        localeService.setLocale(Locale(value));
+                      }
+                    },
+                  ),
+                  RadioListTile<String>(
+                    value: 'en',
+                    groupValue: currentLang,
+                    title: Text(l10n.english),
+                    onChanged: (value) {
+                      if (value != null) {
+                        localeService.setLocale(Locale(value));
+                      }
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+          const Divider(),
+          // GitHub Repository Link
+          ListTile(
+            leading: const Icon(Icons.code),
+            title: const Text('GitHub'),
+            subtitle: const Text('ncc-288/AucorsaBus'),
+            onTap: () async {
+              final uri = Uri.parse('https://github.com/ncc-288/AucorsaBus');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
           ),
         ],
       ),
@@ -363,7 +451,13 @@ class _HomeScreenState extends State<HomeScreen> {
         final api = Provider.of<ApiService>(context, listen: false);
         final alerts = await api.fetchServiceAlerts(forceRefresh: true);
         if (mounted) {
-          setState(() => _serviceAlerts = alerts);
+          final unreadCount = await _alertReadService.getUnreadCount(alerts);
+          final readIds = await _alertReadService.getReadAlertIds();
+          setState(() {
+            _serviceAlerts = alerts;
+            _unreadAlertCount = unreadCount;
+            _readAlertIds = readIds;
+          });
         }
       },
       child: ListView.builder(
@@ -394,8 +488,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               title: Text(
                 alert.title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
+                style: TextStyle(
+                  fontWeight: _readAlertIds.contains(alert.id) ? FontWeight.normal : FontWeight.w800,
                   fontSize: 14,
                 ),
                 maxLines: 1,
@@ -405,6 +499,11 @@ class _HomeScreenState extends State<HomeScreen> {
               collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
               childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               expandedAlignment: Alignment.topLeft,
+              onExpansionChanged: (expanded) {
+                if (expanded) {
+                  _markAlertAsRead(alert.id);
+                }
+              },
               children: [
                 if (alert.content.isNotEmpty)
                   Text(

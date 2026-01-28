@@ -24,7 +24,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get search => 'Search';
 
   @override
-  String get searchHint => 'Search stop or line...';
+  String get searchHint => 'Search stop...';
 
   @override
   String get nextBus => 'Next';
@@ -91,4 +91,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get download => 'Download';
+
+  @override
+  String get editFavorite => 'Edit Favorite';
+
+  @override
+  String get stopName => 'Stop Name';
+
+  @override
+  String get lineName => 'Line Name';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get save => 'Save';
 }

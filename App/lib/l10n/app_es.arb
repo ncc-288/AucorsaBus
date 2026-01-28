@@ -5,7 +5,7 @@
   "lines": "Líneas",
   "stops": "Paradas",
   "search": "Buscar",
-  "searchHint": "Buscar parada o línea...",
+  "searchHint": "Buscar parada...",
   "nextBus": "Próximo",
   "followingBus": "Siguiente",
   "noService": "Sin servicio",
@@ -27,5 +27,10 @@
   "noServiceAlerts": "No hay avisos de servicio.",
   "viewMore": "Ver más",
   "newVersionAvailable": "Nueva versión disponible",
-  "download": "Descargar"
+  "download": "Descargar",
+  "editFavorite": "Editar Favorito",
+  "stopName": "Nombre de Parada",
+  "lineName": "Nombre de Línea",
+  "cancel": "Cancelar",
+  "save": "Guardar"
 }
