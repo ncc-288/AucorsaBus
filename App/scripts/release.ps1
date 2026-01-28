@@ -10,11 +10,13 @@
 #>
 
 param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$Version
 )
 
-$PubspecPath = "..\pubspec.yaml"
+# Resolve path relative to the script file location
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PubspecPath = Join-Path $ScriptDir "..\pubspec.yaml"
 
 # 1. Update pubspec.yaml
 Write-Host " [?] Updating pubspec.yaml to version: $Version" -ForegroundColor Cyan
@@ -24,7 +26,7 @@ $newContent | Set-Content $PubspecPath
 
 # 2. Git Operations
 Write-Host " [?] Committing and Tagging v$Version..." -ForegroundColor Cyan
-git add ..\pubspec.yaml
+git add $PubspecPath
 git commit -m "chore: release v$Version"
 git tag "v$Version"
 
