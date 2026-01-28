@@ -1,0 +1,52 @@
+name: Production Release
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags like v1.0.0
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required for gh release create
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Flutter Clean
+        working-directory: ./App
+        run: flutter clean
+
+      - name: Flutter Pub Get
+        working-directory: ./App
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: ./App
+        run: flutter build apk --release
+
+      - name: Rename Artifact
+        working-directory: ./App
+        run: mv build/app/outputs/flutter-apk/app-release.apk AucorsaBus.apk
+
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "Release ${{ github.ref_name }}" \
+            --generate-notes \
+            ./App/AucorsaBus.apk
