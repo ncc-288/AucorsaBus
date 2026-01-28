@@ -1,6 +1,6 @@
 name: aucorsa_app
 description: Aucorsa Bus Realtime App
-version: 1.3.0+1
+version: 1.4.0
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
