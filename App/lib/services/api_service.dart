@@ -72,7 +72,13 @@ class ApiService {
           : Uri.parse(targetUrl);
       
       _log("Initializing session via: $url");
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          _log("Timeout initializing session");
+          throw Exception('Session timeout');
+        },
+      );
       
       if (response.statusCode == 200) {
         final body = response.body;
@@ -106,7 +112,13 @@ class ApiService {
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
 
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          _log("Timeout fetching lines");
+          throw Exception('Request timeout');
+        },
+      );
       
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -135,8 +147,8 @@ class ApiService {
           : Uri.parse(targetStopsUrl);
 
       final results = await Future.wait([
-        http.get(mapUri),
-        http.get(stopsUri),
+        http.get(mapUri).timeout(const Duration(seconds: 10)),
+        http.get(stopsUri).timeout(const Duration(seconds: 10)),
       ]);
 
       final mapResponse = results[0];
@@ -201,7 +213,13 @@ class ApiService {
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
           
-      final stopResponse = await http.get(stopUri);
+      final stopResponse = await http.get(stopUri).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          _log("Timeout fetching stops");
+          throw Exception('Request timeout');
+        },
+      );
       
       if (stopResponse.statusCode == 200) {
         final List<dynamic> data = json.decode(stopResponse.body);
@@ -228,7 +246,13 @@ class ApiService {
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
       
-      final response = await http.get(uri);
+      final response = await http.get(uri).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          _log("Timeout fetching estimation for stop $stopId");
+          throw Exception('Request timeout');
+        },
+      );
       if (response.statusCode == 200) {
         // Use UTF-8 decoding for proper character handling
         String body = utf8.decode(response.bodyBytes, allowMalformed: true);
@@ -277,7 +301,13 @@ class ApiService {
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
 
-      final response = await http.get(uri);
+      final response = await http.get(uri).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          _log("Timeout fetching all estimations for stop $stopId");
+          throw Exception('Request timeout');
+        },
+      );
       
       if (response.statusCode == 200) {
         // Use UTF-8 decoding from raw bytes for proper character handling
@@ -351,7 +381,13 @@ class ApiService {
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
 
-      final response = await http.get(uri);
+      final response = await http.get(uri).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          _log("Timeout searching stops");
+          throw Exception('Search timeout');
+        },
+      );
       List<BusStop> results = [];
 
       if (response.statusCode == 200) {
@@ -411,23 +447,33 @@ class ApiService {
 
   /// Public method: Get estimations for a line's stops with smart caching.
   /// [directionIndex] is used to differentiate cache for each direction.
+  /// Uses batched parallel requests to avoid overwhelming the connection.
   Future<Map<String, Estimation?>> getLineEstimations(String lineId, int directionIndex, List<BusStop> stops) async {
     final cacheKey = 'line_${lineId}_dir_$directionIndex';
     if (_isCacheValid(cacheKey) && _lineEstimationsCache.containsKey(cacheKey)) {
       _log("Returning cached data for $cacheKey");
       return _lineEstimationsCache[cacheKey]!;
     }
-    // Fetch fresh data in parallel
-    final List<Future<Estimation?>> futures = stops.map((stop) =>
-        fetchEstimation(stop.id, lineId, stop.label)).toList();
-    final results = await Future.wait(futures);
-
+    
+    // Fetch fresh data in batches of 8 to avoid overwhelming the connection
+    const batchSize = 8;
     final estimations = <String, Estimation?>{};
-    for (var est in results) {
-      if (est != null) {
-        estimations[est.stopId] = est;
+    
+    for (var i = 0; i < stops.length; i += batchSize) {
+      final batchEnd = (i + batchSize < stops.length) ? i + batchSize : stops.length;
+      final batch = stops.sublist(i, batchEnd);
+      
+      final List<Future<Estimation?>> futures = batch.map((stop) =>
+          fetchEstimation(stop.id, lineId, stop.label)).toList();
+      final results = await Future.wait(futures);
+      
+      for (var est in results) {
+        if (est != null) {
+          estimations[est.stopId] = est;
+        }
       }
     }
+    
     _lineEstimationsCache[cacheKey] = estimations;
     _lastFetchTime[cacheKey] = DateTime.now();
     return estimations;
@@ -449,19 +495,30 @@ class ApiService {
   }
 
   /// Force refresh line estimations for a direction, bypassing cache check but updating cache.
+  /// Uses batched parallel requests to avoid overwhelming the connection.
   Future<Map<String, Estimation?>> forceRefreshLineEstimations(String lineId, int directionIndex, List<BusStop> stops) async {
     final cacheKey = 'line_${lineId}_dir_$directionIndex';
     _log("Force refreshing $cacheKey");
-    final List<Future<Estimation?>> futures = stops.map((stop) =>
-        fetchEstimation(stop.id, lineId, stop.label)).toList();
-    final results = await Future.wait(futures);
-
+    
+    // Fetch fresh data in batches of 8 to avoid overwhelming the connection
+    const batchSize = 8;
     final estimations = <String, Estimation?>{};
-    for (var est in results) {
-      if (est != null) {
-        estimations[est.stopId] = est;
+    
+    for (var i = 0; i < stops.length; i += batchSize) {
+      final batchEnd = (i + batchSize < stops.length) ? i + batchSize : stops.length;
+      final batch = stops.sublist(i, batchEnd);
+      
+      final List<Future<Estimation?>> futures = batch.map((stop) =>
+          fetchEstimation(stop.id, lineId, stop.label)).toList();
+      final results = await Future.wait(futures);
+      
+      for (var est in results) {
+        if (est != null) {
+          estimations[est.stopId] = est;
+        }
       }
     }
+
     _lineEstimationsCache[cacheKey] = estimations;
     _lastFetchTime[cacheKey] = DateTime.now();
     return estimations;
@@ -490,7 +547,13 @@ class ApiService {
           : Uri.parse(targetUrl);
       
       _log("Fetching service alerts from: $url");
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          _log("Timeout fetching service alerts");
+          throw Exception('Alerts timeout');
+        },
+      );
       
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = json.decode(response.body);
