@@ -18,7 +18,7 @@ class ApiService {
   final Map<String, DateTime> _lastFetchTime = {};
   final Map<String, List<Estimation>> _stopEstimationsCache = {};
   final Map<String, Map<String, Estimation?>> _lineEstimationsCache = {};
-  static const Duration _cacheMaxAge = Duration(seconds: 30);
+  static const Duration _cacheMaxAge = Duration(seconds: 25);
 
   void _log(String message) {
     developer.log(message, name: 'ApiService');
