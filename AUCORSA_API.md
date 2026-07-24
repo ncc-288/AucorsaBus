@@ -2,8 +2,11 @@
 
 This document describes the unofficial REST API used by `aucorsa.es` to provide real-time bus information in Córdoba, Spain.
 
-## Base URL
-`https://aucorsa.es/wp-json/aucorsa/v1`
+## Base URLs
+- **Main API**: `https://aucorsa.es/wp-json/aucorsa/v1`
+- **Light API (Estimations)**: `https://lightapi.aucorsa.es/wp-json/aucorsa/v1`
+
+**IMPORTANT**: Real-time estimations MUST use the `lightapi.aucorsa.es` domain. The main domain blocks estimation requests.
 
 ## Authentication (Nonce-based)
 The API is protected by a WordPress nonce. To make successful requests, you must first obtain a valid nonce from the main website.
@@ -66,11 +69,13 @@ The response is an array of clusters (usually 2). Each cluster represents one "w
 ### 4. Real-time Estimations
 Returns arrival estimations. This endpoint returns **escaped HTML string** inside the JSON response.
 
+**CRITICAL**: Use `lightapi.aucorsa.es` domain, NOT the main `aucorsa.es` domain!
+
 **Example Request (All lines at a stop):**
-`GET /estimations/stop?stop_id=105&_wpnonce=f2e3d4c5`
+`GET https://lightapi.aucorsa.es/wp-json/aucorsa/v1/estimations/stop?stop_id=105&_wpnonce=f2e3d4c5`
 
 **Example Request (Specific line at a stop):**
-`GET /estimations/stop?line=706&current_line=706&stop_id=105&_wpnonce=f2e3d4c5`
+`GET https://lightapi.aucorsa.es/wp-json/aucorsa/v1/estimations/stop?line=706&current_line=706&stop_id=105&_wpnonce=f2e3d4c5`
 
 **Sample HTML Output (Parsed):**
 ```html

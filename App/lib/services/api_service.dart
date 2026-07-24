@@ -6,6 +6,7 @@ import '../models/models.dart';
 
 class ApiService {
   static const String _baseUrl = 'https://aucorsa.es/wp-json/aucorsa/v1';
+  static const String _lightApiUrl = 'https://lightapi.aucorsa.es/wp-json/aucorsa/v1';
   
   String get _proxyUrl => kIsWeb ? 'https://corsproxy.io/?' : '';
 
@@ -222,7 +223,7 @@ class ApiService {
     try {
       // Add timestamp to prevent CORS proxy caching
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final targetUrl = '$_baseUrl/estimations/stop?line=$lineId&current_line=$lineId&stop_id=$stopId&_wpnonce=$_nonce&_t=$timestamp';
+      final targetUrl = '$_lightApiUrl/estimations/stop?line=$lineId&current_line=$lineId&stop_id=$stopId&_wpnonce=$_nonce&_t=$timestamp';
       final uri = kIsWeb 
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
@@ -271,7 +272,7 @@ class ApiService {
     try {
       // Add timestamp to prevent CORS proxy caching
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final targetUrl = '$_baseUrl/estimations/stop?line=&current_line=&stop_id=$stopId&_wpnonce=$_nonce&_t=$timestamp';
+      final targetUrl = '$_lightApiUrl/estimations/stop?line=&current_line=&stop_id=$stopId&_wpnonce=$_nonce&_t=$timestamp';
       final uri = kIsWeb 
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
