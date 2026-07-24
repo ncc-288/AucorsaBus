@@ -72,7 +72,12 @@ class ApiService {
           : Uri.parse(targetUrl);
       
       _log("Initializing session via: $url");
-      final response = await http.get(url).timeout(
+      final response = await http.get(
+        url,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36',
+        },
+      ).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
           _log("Timeout initializing session");
@@ -87,10 +92,14 @@ class ApiService {
           _nonce = nonceMatch.group(1);
           _nonceTimestamp = DateTime.now();
           _log("Got Nonce: $_nonce");
+        } else {
+          _log("ERROR: Could not extract nonce from response");
         }
+      } else {
+        _log("ERROR: Session init failed with status ${response.statusCode}");
       }
     } catch (e) {
-      _log("Error initializing session: $e");
+      _log("ERROR initializing session: $e");
     }
   }
 
@@ -112,7 +121,12 @@ class ApiService {
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
 
-      final response = await http.get(url).timeout(
+      final response = await http.get(
+        url,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36',
+        },
+      ).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
           _log("Timeout fetching lines");
@@ -147,8 +161,12 @@ class ApiService {
           : Uri.parse(targetStopsUrl);
 
       final results = await Future.wait([
-        http.get(mapUri).timeout(const Duration(seconds: 10)),
-        http.get(stopsUri).timeout(const Duration(seconds: 10)),
+        http.get(mapUri, headers: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36',
+        }).timeout(const Duration(seconds: 10)),
+        http.get(stopsUri, headers: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36',
+        }).timeout(const Duration(seconds: 10)),
       ]);
 
       final mapResponse = results[0];
@@ -213,7 +231,12 @@ class ApiService {
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
           
-      final stopResponse = await http.get(stopUri).timeout(
+      final stopResponse = await http.get(
+        stopUri,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36',
+        },
+      ).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
           _log("Timeout fetching stops");
@@ -238,6 +261,7 @@ class ApiService {
   }
 
   Future<Estimation?> fetchEstimation(String stopId, String lineId, String stopName) async {
+    _log("fetchEstimation: stop=$stopId, line=$lineId");
     try {
       // Add timestamp to prevent CORS proxy caching
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -246,25 +270,40 @@ class ApiService {
           ? Uri.parse('$_proxyUrl${Uri.encodeComponent(targetUrl)}')
           : Uri.parse(targetUrl);
       
-      final response = await http.get(uri).timeout(
+      final response = await http.get(
+        uri,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36',
+        },
+      ).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
           _log("Timeout fetching estimation for stop $stopId");
           throw Exception('Request timeout');
         },
       );
+      
+      _log("fetchEstimation: stop=$stopId, status=${response.statusCode}");
+      
       if (response.statusCode == 200) {
         // Use UTF-8 decoding for proper character handling
         String body = utf8.decode(response.bodyBytes, allowMalformed: true);
+        _log("fetchEstimation: stop=$stopId, body length=${body.length}");
 
         try {
           if (body.startsWith('"') || body.startsWith("'")) {
              final decoded = json.decode(body);
-             if (decoded is String) body = decoded;
+             if (decoded is String) {
+               _log("fetchEstimation: stop=$stopId, JSON decoded");
+               body = decoded;
+             }
           }
-        } catch (_) {}
+        } catch (e) {
+          _log("fetchEstimation: stop=$stopId, JSON decode failed: $e");
+        }
         
         if (body.contains('ppp-no-estimations') || body.contains('Sin estimaci')) {
+           _log("fetchEstimation: stop=$stopId, NO ESTIMATIONS - returning 'Sin servicio'");
            return Estimation(stopId: stopId, stopName: stopName, nextBus: 'Sin servicio', followingBus: '-');
         }
 
@@ -283,9 +322,13 @@ class ApiService {
         if (next != 'Sin servicio') {
           return Estimation(stopId: stopId, stopName: stopName, nextBus: next, followingBus: follow);
         }
+      } else {
+        _log("fetchEstimation: stop=$stopId, bad status=${response.statusCode}");
       }
-    } catch (_) {
+    } catch (e) {
+      _log("fetchEstimation: stop=$stopId, EXCEPTION: $e");
     }
+    _log("fetchEstimation: stop=$stopId, returning NULL");
     return null;
   }
 
@@ -447,11 +490,14 @@ class ApiService {
 
   /// Public method: Get estimations for a line's stops with smart caching.
   /// [directionIndex] is used to differentiate cache for each direction.
-  /// Uses batched parallel requests to avoid overwhelming the connection.
   Future<Map<String, Estimation?>> getLineEstimations(String lineId, int directionIndex, List<BusStop> stops) async {
-    // Ensure session is initialized before fetching
+    // Try to ensure session is initialized
     await _initializeSession();
-    if (_nonce == null) return {};
+    
+    // Log warning if nonce is null but continue anyway
+    if (_nonce == null) {
+      _log("WARNING: Nonce is null, requests may fail");
+    }
     
     final cacheKey = 'line_${lineId}_dir_$directionIndex';
     if (_isCacheValid(cacheKey) && _lineEstimationsCache.containsKey(cacheKey)) {
@@ -459,25 +505,22 @@ class ApiService {
       return _lineEstimationsCache[cacheKey]!;
     }
     
-    // Fetch fresh data in batches of 8 to avoid overwhelming the connection
-    const batchSize = 8;
-    final estimations = <String, Estimation?>{};
+    // Fetch all in parallel
+    _log("Fetching ${stops.length} estimations in parallel");
+    final List<Future<Estimation?>> futures = stops.map((stop) =>
+        fetchEstimation(stop.id, lineId, stop.label)).toList();
+    final results = await Future.wait(futures);
     
-    for (var i = 0; i < stops.length; i += batchSize) {
-      final batchEnd = (i + batchSize < stops.length) ? i + batchSize : stops.length;
-      final batch = stops.sublist(i, batchEnd);
-      
-      final List<Future<Estimation?>> futures = batch.map((stop) =>
-          fetchEstimation(stop.id, lineId, stop.label)).toList();
-      final results = await Future.wait(futures);
-      
-      for (var est in results) {
-        if (est != null) {
-          estimations[est.stopId] = est;
-        }
+    final estimations = <String, Estimation?>{};
+    int successCount = 0;
+    for (var est in results) {
+      if (est != null) {
+        estimations[est.stopId] = est;
+        successCount++;
       }
     }
     
+    _log("Parallel fetch complete: $successCount/${stops.length} succeeded");
     _lineEstimationsCache[cacheKey] = estimations;
     _lastFetchTime[cacheKey] = DateTime.now();
     return estimations;
@@ -499,34 +542,34 @@ class ApiService {
   }
 
   /// Force refresh line estimations for a direction, bypassing cache check but updating cache.
-  /// Uses batched parallel requests to avoid overwhelming the connection.
   Future<Map<String, Estimation?>> forceRefreshLineEstimations(String lineId, int directionIndex, List<BusStop> stops) async {
-    // Ensure session is initialized before fetching
+    // Try to ensure session is initialized
     await _initializeSession();
-    if (_nonce == null) return {};
+    
+    // Log warning if nonce is null but continue anyway
+    if (_nonce == null) {
+      _log("WARNING: Nonce is null during force refresh, requests may fail");
+    }
     
     final cacheKey = 'line_${lineId}_dir_$directionIndex';
     _log("Force refreshing $cacheKey");
     
-    // Fetch fresh data in batches of 8 to avoid overwhelming the connection
-    const batchSize = 8;
+    // Fetch all in parallel
+    _log("Force refresh: ${stops.length} estimations in parallel");
+    final List<Future<Estimation?>> futures = stops.map((stop) =>
+        fetchEstimation(stop.id, lineId, stop.label)).toList();
+    final results = await Future.wait(futures);
+
     final estimations = <String, Estimation?>{};
-    
-    for (var i = 0; i < stops.length; i += batchSize) {
-      final batchEnd = (i + batchSize < stops.length) ? i + batchSize : stops.length;
-      final batch = stops.sublist(i, batchEnd);
-      
-      final List<Future<Estimation?>> futures = batch.map((stop) =>
-          fetchEstimation(stop.id, lineId, stop.label)).toList();
-      final results = await Future.wait(futures);
-      
-      for (var est in results) {
-        if (est != null) {
-          estimations[est.stopId] = est;
-        }
+    int successCount = 0;
+    for (var est in results) {
+      if (est != null) {
+        estimations[est.stopId] = est;
+        successCount++;
       }
     }
 
+    _log("Force refresh complete: $successCount/${stops.length} estimations");
     _lineEstimationsCache[cacheKey] = estimations;
     _lastFetchTime[cacheKey] = DateTime.now();
     return estimations;
