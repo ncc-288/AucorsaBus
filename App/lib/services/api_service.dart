@@ -449,6 +449,10 @@ class ApiService {
   /// [directionIndex] is used to differentiate cache for each direction.
   /// Uses batched parallel requests to avoid overwhelming the connection.
   Future<Map<String, Estimation?>> getLineEstimations(String lineId, int directionIndex, List<BusStop> stops) async {
+    // Ensure session is initialized before fetching
+    await _initializeSession();
+    if (_nonce == null) return {};
+    
     final cacheKey = 'line_${lineId}_dir_$directionIndex';
     if (_isCacheValid(cacheKey) && _lineEstimationsCache.containsKey(cacheKey)) {
       _log("Returning cached data for $cacheKey");
@@ -497,6 +501,10 @@ class ApiService {
   /// Force refresh line estimations for a direction, bypassing cache check but updating cache.
   /// Uses batched parallel requests to avoid overwhelming the connection.
   Future<Map<String, Estimation?>> forceRefreshLineEstimations(String lineId, int directionIndex, List<BusStop> stops) async {
+    // Ensure session is initialized before fetching
+    await _initializeSession();
+    if (_nonce == null) return {};
+    
     final cacheKey = 'line_${lineId}_dir_$directionIndex';
     _log("Force refreshing $cacheKey");
     
